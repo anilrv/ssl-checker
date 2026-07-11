@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Privacy Policy — SSL Issue Checker</title>
+<link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="shortcut icon" href="/favicon.ico" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; line-height: 1.5; color: #1b1f24; }
+  h1 { font-size: 22px; }
+  h2 { font-size: 16px; margin-top: 28px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th, td { border: 1px solid #d8dee4; padding: 6px 10px; text-align: left; font-size: 14px; }
+  th { background: #f6f8fa; }
+  code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; }
+  .updated { color: #59636e; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Privacy Policy — SSL Issue Checker</h1>
+<p class="updated">Last updated: 2026-07-11</p>
+
+<p>SSL Issue Checker is a Chrome extension that checks the TLS/SSL certificate of the site in your active browser tab and reports its organization, issuer, validity, and any certificate issues, along with additional hosting and domain-registration details described below.</p>
+
+<h2>What data this extension accesses</h2>
+<ul>
+  <li><strong>The hostname of your active tab</strong> (e.g. <code>example.com</code>), read via Chrome's <code>tabs</code> permission, only for the site currently open in your browser.</li>
+  <li><strong>Nothing else about the page</strong> — not the full URL, path, query string, page content, form data, or browsing history.</li>
+</ul>
+
+<h2>What this extension does with that data</h2>
+<ul>
+  <li>When you view a site or click the extension icon, <strong>only the bare hostname</strong> of the active tab (e.g. <code>example.com</code>, never the full URL) is sent to this extension's own backend — a service the developer operates at <code>ssl-checker.anilrv.in</code> — so it can perform a live TLS handshake against that hostname and report back what it finds.</li>
+  <li>The backend returns certificate details (organization, issuer, validity dates, protocol, and any detected issues), which the extension displays in its popup and toolbar badge/tooltip.</li>
+  <li>On first use, the extension also calls this same backend once to obtain an access token used to authenticate its own requests. No personal information is exchanged in that step.</li>
+  <li><strong>No analytics, tracking, or advertising data collection</strong> of any kind, and no data broker or third-party integrations.</li>
+  <li><strong>Nothing is sold or shared</strong> with any third party. The only network destination this extension ever talks to is its own backend, operated by the developer, solely to perform the certificate check you're requesting.</li>
+  <li>If you turn on the optional <strong>floating view</strong>, the extension draws a small draggable panel directly on the page showing the same result already visible in the popup (organization, issuer, issues). This is rendered entirely on your device from data already fetched — nothing new is sent anywhere to show it, and it doesn't read or modify anything else on the page.</li>
+</ul>
+
+<h2>Additional lookups performed by our backend</h2>
+<p>To show hosting and domain-registration details (server software, network/ASN, approximate server location, registrar, DNS provider), our backend — never the extension directly — makes two further lookups against third-party data providers. These are public infrastructure/registration lookups about the <em>site's server or domain</em>, not about you:</p>
+<ul>
+  <li><strong><a href="https://ipgeolocation.io/" target="_blank" rel="noopener noreferrer">ipgeolocation.io</a></strong> — our backend sends the site's resolved server IP address to look up its approximate location (country/city) and network operator (ASN). Your own IP address is never sent to this or any other third party.</li>
+  <li><strong><a href="https://whoisjson.com/" target="_blank" rel="noopener noreferrer">whoisjson.com</a></strong> — our backend sends the site's registrable domain name to look up public WHOIS registration data (registrar, registration/expiry dates, DNS provider, registered owner organization).</li>
+</ul>
+<p>Both lookups are cached on our backend (server IPs for up to 7 days, domains for up to 24 hours) purely to reduce repeat calls, and neither provider receives any information about you, your browser, or your IP address — only the hostname/IP already being checked.</p>
+
+<h2>Where data is stored</h2>
+<ul>
+  <li>The extension stores its access token locally on your device via <code>chrome.storage.local</code> — this never leaves your device except when presented back to the backend to authenticate a check request.</li>
+  <li>Whether you've turned floating view on or off is also stored locally via <code>chrome.storage.local</code>.</li>
+  <li>The backend keeps a short-lived, in-memory cache of recent check results (hostname and certificate metadata, up to 24 hours) purely to avoid re-checking the same site repeatedly. It is not tied to your identity, browser, or IP address, and there is no persistent logging or analytics platform attached to it.</li>
+</ul>
+
+<h2>Permissions justification</h2>
+<table>
+  <tr><th>Permission</th><th>Why it's needed</th></tr>
+  <tr><td><code>tabs</code></td><td>To read the hostname of the active tab so it can be checked.</td></tr>
+  <tr><td><code>storage</code></td><td>To save the access token and your floating-view preference locally so they don't need to be re-fetched or re-set every time.</td></tr>
+  <tr><td>Content script on <code>https://*/*</code></td><td>Draws the optional floating panel on the page when you turn floating view on, so it can follow you across normal browsing instead of disappearing on every page change. It stays inert (does nothing) unless you've explicitly turned floating view on.</td></tr>
+</table>
+
+<h2>Contact</h2>
+<p>Questions about this extension can be directed to the developer via the Chrome Web Store listing page.</p>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="header">
+      <div id="seal" class="seal" data-status="">
+        <span id="seal-glyph"></span>
+      </div>
+      <div id="titles">
+        <div id="hostname">—</div>
+        <div id="verdict"></div>
+      </div>
+      <button id="float-view" title="Show floating view on page" aria-label="Show floating view on page">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+      </button>
+      <button id="rescan" title="Re-scan" aria-label="Re-scan">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+      </button>
+    </header>
+
+    <section id="identity" class="rows"></section>
+
+    <section id="issues"></section>
+
+    <details id="tech">
+      <summary>SSL</summary>
+      <div class="rows" id="tech-rows"></div>
+    </details>
+
+    <details id="hosting">
+      <summary>Hosting</summary>
+      <div class="rows" id="hosting-rows"></div>
+    </details>
+
+    <details id="domain">
+      <summary>Domain</summary>
+      <div class="rows" id="domain-rows"></div>
+    </details>
+  </div>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

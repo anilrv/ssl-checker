@@ -1,0 +1,23 @@
+# --- Go backend (Azure Functions) ---
+backend/bin/
+backend/obj/
+backend/*.log
+
+# Azure Functions local dev settings — holds connection strings/keys for local runs,
+# never meant to leave the machine (this is Microsoft's own standard exclusion).
+backend/local.settings.json
+
+# --- Release artifacts ---
+# Chrome Web Store manifest signing key — a secret, must never enter git history.
+release/*.pem
+# Built upload zip is a generated artifact, not source.
+release/*.zip
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+*.swp
+
+# --- Env files (defensive — none exist yet, but never commit if added later) ---
+.env
+.env.local
