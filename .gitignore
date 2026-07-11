@@ -8,15 +8,17 @@ backend/*.log
 backend/local.settings.json
 
 # --- Release artifacts ---
-# Chrome Web Store manifest signing key — a secret, must never enter git history.
-release/*.pem
-# Built upload zip is a generated artifact, not source.
-release/*.zip
+# The whole directory stays out of git: the Web Store manifest signing key (a secret
+# that must never enter history), built upload zips, and store-listing screenshots.
+release/
 
 # --- OS / editor cruft ---
 .DS_Store
 Thumbs.db
 *.swp
+
+# --- Playwright MCP session artifacts ---
+.playwright-mcp/
 
 # --- Env files (defensive — none exist yet, but never commit if added later) ---
 .env
