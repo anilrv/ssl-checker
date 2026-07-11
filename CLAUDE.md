@@ -145,6 +145,29 @@ Load unpacked: `chrome://extensions` → enable Developer mode → **Load unpack
 select `extension/`. Chrome pins the extension to the exact folder path it was loaded
 from — if the repo is ever moved, remove and re-add the unpacked extension.
 
+### Publishing to the Chrome Web Store
+
+The store item ID is `ondenicnbkaepibppfhcafdlfidgfpbm` — it MUST stay this value,
+because the Azure Function app whitelists it. The ID is pinned three ways: the `"key"`
+field in `manifest.json` (for unpacked installs), the private key
+`release/ssl_plugin_extension_key.pem` (never commit, never lose — the ID is
+unrecoverable without it and reserved forever by the store), and the published item
+itself (never delete the item; the store blocks re-uploading a deleted item's key).
+
+Upload-zip rules (learned the hard way; the store's docs don't spell these out):
+
+- Zip the CONTENTS of `extension/` (manifest at zip root), excluding
+  `privacy-policy.md`/`STORE_LISTING.md`.
+- **Strip the `"key"` field from the zipped manifest** — first-time uploads are rejected
+  if it's present (update uploads tolerate it). Keep it in the repo's manifest for
+  unpacked dev installs.
+- The first upload included the signing key as `key.pem` at the zip root to force the
+  store to assign the pinned ID. **Update uploads don't need `key.pem`** — the store
+  already knows the ID and re-signs packages itself.
+- Bump `"version"` in `manifest.json` for every update upload, and update the privacy
+  tab if data flows change (the hostname-to-backend call is declared as "Web history"
+  collection).
+
 ## Required Azure Function app settings
 
 `CHECKSSL_KEY`, `WHOISJSON_TOKEN`, `IPGEOLOCATION_TOKEN` (plus whatever Azure itself
