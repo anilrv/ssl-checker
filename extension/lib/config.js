@@ -1,7 +1,8 @@
 // This deployment's backend URL is fixed and public — there's nothing for the user to
 // configure. The function key isn't typed in either: the extension fetches it itself from
-// the backend's /api/bootstrap endpoint, which is gated server-side by Origin + rate limit
-// rather than by a key of its own.
+// the backend's /api/bootstrap endpoint, which is anonymous and gated only by per-IP rate
+// limiting (an Origin check isn't possible here: Chrome never sends a real Origin header
+// on extension-page fetches without host_permissions, so nothing to check server-side).
 
 const FUNCTION_URL = 'https://ssl-checker.anilrv.in/api/checkssl';
 const BOOTSTRAP_URL = 'https://ssl-checker.anilrv.in/api/bootstrap';
