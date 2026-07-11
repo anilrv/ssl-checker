@@ -179,7 +179,13 @@ function render(tab, result) {
     return;
   }
 
-  const status = overallStatus(result.issues);
+  // A client-side failure (backend unreachable, key rejected, non-OK response) arrives as
+  // { issues: [], error } — without this branch, empty issues would read as 'ok' and the
+  // popup would show a green "No issues found" for a check that never happened.
+  const status =
+    result.error && (!result.issues || result.issues.length === 0)
+      ? 'info'
+      : overallStatus(result.issues);
   sealEl.dataset.status = status;
   sealGlyphEl.textContent = sealGlyph(status);
   sealEl.classList.remove('stamp');
@@ -289,6 +295,19 @@ async function refresh(force) {
     }
     if (resp.status === 401 || resp.status === 403) {
       render(tab, { issues: [], error: 'Function key was rejected by the backend.' });
+      return;
+    }
+    if (!resp.ok) {
+      // e.g. 429 rate limit or 400 — the body is {"error": msg}, not a CheckResult;
+      // rendering it as one would show a false "No issues found".
+      let msg = `Check failed (HTTP ${resp.status})`;
+      try {
+        const body = await resp.json();
+        if (body && body.error) msg = body.error;
+      } catch (e) {
+        // non-JSON error body — keep the generic message
+      }
+      render(tab, { issues: [], error: msg });
       return;
     }
     const result = await resp.json();

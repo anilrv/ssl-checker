@@ -325,9 +325,27 @@ func corsOrigin(r *http.Request) string {
 }
 
 func clientIPFrom(r *http.Request) string {
+	// The public hostname is proxied through Cloudflare, which sets CF-Connecting-IP to the
+	// real client address on every proxied request. X-Forwarded-For's last entry is Azure's
+	// view of the caller — under the proxy that's a Cloudflare EDGE IP, which would bucket
+	// unrelated users together and let an abuser rotate edges. NOTE: CF-Connecting-IP is
+	// only trustworthy while the *.azurewebsites.net origin is restricted to Cloudflare's
+	// IP ranges — anyone reaching the origin directly can forge it.
+	if cf := r.Header.Get("CF-Connecting-IP"); cf != "" {
+		return cf
+	}
+
+	// Fallback (direct-to-origin traffic): X-Forwarded-For can arrive with client-supplied
+	// entries already in it; Azure's front end APPENDS the real caller, so only the LAST
+	// entry is trustworthy — taking the first would let a caller rotate fake IPs to sidestep
+	// the per-IP rate limit. Azure formats its entry as ip:port, so strip the port.
 	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
 		parts := strings.Split(fwd, ",")
-		return strings.TrimSpace(parts[0])
+		last := strings.TrimSpace(parts[len(parts)-1])
+		if host, _, err := net.SplitHostPort(last); err == nil {
+			return host
+		}
+		return last
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err == nil {
@@ -464,17 +482,18 @@ func computeIssues(hostname string, probe *certprobe.Result, weakProtocol bool) 
 		}
 	}
 
-	if len(probe.DNSNames) > 0 {
-		matched := false
-		for _, san := range probe.DNSNames {
-			if matchesHostname(hostname, san) {
-				matched = true
-				break
-			}
+	// A cert with no SANs at all can't cover any hostname — browsers ignore the legacy
+	// CommonName field entirely (Chrome since 58) — so an empty DNSNames list is itself
+	// a mismatch, not a pass.
+	matched := false
+	for _, san := range probe.DNSNames {
+		if matchesHostname(hostname, san) {
+			matched = true
+			break
 		}
-		if !matched {
-			issues = append(issues, "hostname-mismatch")
-		}
+	}
+	if !matched {
+		issues = append(issues, "hostname-mismatch")
 	}
 
 	if weakProtocol {

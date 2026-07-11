@@ -5,6 +5,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
+
+	"sslcheckerfunc/certprobe"
 )
 
 func doCheck(t *testing.T, host string) CheckResult {
@@ -78,6 +81,52 @@ func TestRateLimit(t *testing.T) {
 	}
 	if allowed != 20 {
 		t.Errorf("expected exactly 20 allowed requests, got %d", allowed)
+	}
+}
+
+func TestClientIPFromXFF(t *testing.T) {
+	cases := []struct {
+		xff  string
+		want string
+	}{
+		{"1.2.3.4", "1.2.3.4"},
+		{"1.2.3.4:54321", "1.2.3.4"},             // Azure appends ip:port
+		{"6.6.6.6, 1.2.3.4:54321", "1.2.3.4"},    // spoofed first entry must be ignored
+		{"6.6.6.6, 7.7.7.7, 1.2.3.4", "1.2.3.4"}, // only the last (proxy-appended) entry counts
+		{"[2001:db8::1]:443", "2001:db8::1"},     // bracketed IPv6 with port
+	}
+	for _, c := range cases {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("X-Forwarded-For", c.xff)
+		if got := clientIPFrom(req); got != c.want {
+			t.Errorf("XFF %q: got %q, want %q", c.xff, got, c.want)
+		}
+	}
+}
+
+func TestClientIPPrefersCloudflareHeader(t *testing.T) {
+	// Proxied through Cloudflare, XFF's last entry is a CF edge IP — CF-Connecting-IP
+	// must win over it.
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("CF-Connecting-IP", "1.2.3.4")
+	req.Header.Set("X-Forwarded-For", "1.2.3.4, 172.71.0.99:44321")
+	if got := clientIPFrom(req); got != "1.2.3.4" {
+		t.Errorf("expected CF-Connecting-IP to win, got %q", got)
+	}
+}
+
+func TestComputeIssuesNoSANs(t *testing.T) {
+	now := time.Now()
+	probe := &certprobe.Result{
+		NotBefore:     now.Add(-24 * time.Hour),
+		NotAfter:      now.Add(24 * time.Hour),
+		ChainComplete: true,
+		ChainVerified: true,
+		// DNSNames deliberately empty: browsers ignore CN, so a SAN-less cert covers nothing.
+	}
+	issues := computeIssues("example.com", probe, false)
+	if !contains(issues, "hostname-mismatch") {
+		t.Errorf("expected hostname-mismatch for a SAN-less cert, got %v", issues)
 	}
 }
 

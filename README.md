@@ -38,9 +38,11 @@ lookup ([ipgeolocation.io](https://ipgeolocation.io)) run concurrently with the 
 Both enrichment lookups are best-effort — a slow or failed upstream never breaks the core
 certificate check, it just leaves those fields blank.
 
-Only the hostname of your active tab is ever sent anywhere; see
-[`extension/privacy-policy.md`](extension/privacy-policy.md) for the full breakdown of what
-each backend call sends and to whom.
+Only the hostname of your active tab is ever sent anywhere; see the
+[privacy policy](https://ssl-checker.anilrv.in/api/privacy) (authored in
+[`backend/privacy.html`](backend/privacy.html), mirrored in
+[`extension/privacy-policy.md`](extension/privacy-policy.md)) for the full breakdown of
+what each backend call sends and to whom.
 
 ## Development
 

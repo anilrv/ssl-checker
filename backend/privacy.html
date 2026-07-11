@@ -49,6 +49,14 @@
 </ul>
 <p>Both lookups are cached on our backend (server IPs for up to 7 days, domains for up to 24 hours) purely to reduce repeat calls, and neither provider receives any information about you, your browser, or your IP address — only the hostname/IP already being checked.</p>
 
+<h2>Infrastructure and service providers</h2>
+<p>For full transparency, this service runs on the following infrastructure. None of these providers receive more than what's described, and none are used for analytics or advertising:</p>
+<ul>
+  <li><strong>Microsoft Azure</strong> — hosts the backend (an Azure Function). As the hosting platform it processes each request — the checked hostname and standard connection metadata — under Azure's own platform logging.</li>
+  <li><strong>Cloudflare</strong> — provides DNS for the backend's domain and proxies traffic to it. As a proxy it sees your IP address and the hostname being checked in transit, like any CDN, subject to Cloudflare's own privacy policy.</li>
+  <li><strong>Cloudflare DNS and Google Public DNS (DNS-over-HTTPS)</strong> — the backend resolves the checked site's hostname through these public resolvers before probing it. These queries originate from our backend, contain only the hostname being checked, and carry nothing about you, your browser, or your IP address.</li>
+</ul>
+
 <h2>Where data is stored</h2>
 <ul>
   <li>The extension stores its access token locally on your device via <code>chrome.storage.local</code> — this never leaves your device except when presented back to the backend to authenticate a check request.</li>

@@ -100,16 +100,45 @@ type dohResponse struct {
 	Answer []dohAnswer `json:"Answer"`
 }
 
+// Two independently operated DoH resolvers, tried in order — both speak the same
+// dns-json schema, so a Cloudflare outage degrades to Google instead of failing every
+// uncached check (DoH is the one external dependency the probe can't work without).
+var dohEndpoints = []string{
+	"https://cloudflare-dns.com/dns-query",
+	"https://dns.google/resolve",
+}
+
+var httpClient = &http.Client{}
+
 func dohQuery(ctx context.Context, hostname, qtype string) ([]string, error) {
-	reqURL := fmt.Sprintf("https://cloudflare-dns.com/dns-query?name=%s&type=%s", url.QueryEscape(hostname), qtype)
+	var lastErr error
+	for _, endpoint := range dohEndpoints {
+		out, err := dohQueryOne(ctx, endpoint, hostname, qtype)
+		if err == nil {
+			// A successful query with zero answers (NXDOMAIN, no records of this type) is
+			// a real answer, not an outage — asking another resolver wouldn't change it.
+			return out, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
+func dohQueryOne(ctx context.Context, endpoint, hostname, qtype string) ([]string, error) {
+	// Per-attempt sub-deadline: a primary that HANGS (rather than failing fast) must not
+	// eat ResolvePublicIP's whole 5s budget and starve the fallback of time to answer.
+	ctx, cancel := context.WithTimeout(ctx, 2500*time.Millisecond)
+	defer cancel()
+
+	reqURL := fmt.Sprintf("%s?name=%s&type=%s", endpoint, url.QueryEscape(hostname), qtype)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
+	// Required by Cloudflare to get the JSON form; dns.google/resolve ignores it.
 	req.Header.Set("Accept", "application/dns-json")
 
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

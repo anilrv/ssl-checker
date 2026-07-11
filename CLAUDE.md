@@ -117,8 +117,9 @@ Manifest V3. Two independent surfaces read the same `CheckResult`:
 - `background.js` — runs the check per tab, caches the latest result per `tabId`, answers
   `getResult` messages from `content.js` and pushes `sslResult` messages on update.
 - `lib/config.js` — fixed backend URL, no user-facing setup. Fetches the function key once
-  from `/api/bootstrap` and caches it in `chrome.storage.local`; retries the bootstrap
-  fetch once on a 401/403 from `checkssl` (covers key rotation).
+  from `/api/bootstrap` and caches it in `chrome.storage.local`. The retry-on-401/403
+  (re-bootstrap once, covers key rotation) lives in the callers — `background.js` and
+  `popup.js` — not in this module.
 
 ### Conventions that matter here
 

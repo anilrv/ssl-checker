@@ -2,6 +2,21 @@ import { getFunctionUrl, fetchFunctionKey, ensureFunctionKey, buildCheckUrl } fr
 
 const DEFAULT_TITLE = 'SSL Issue Checker';
 
+// Severity per issue — must stay in sync with ISSUE_LABELS in popup.js/content.js so the
+// badge color always agrees with the severity the popup and floating panel display.
+const ISSUE_LEVELS = {
+  'no-https': 'critical',
+  expired: 'critical',
+  'not-yet-valid': 'critical',
+  'self-signed': 'critical',
+  'incomplete-chain': 'warning',
+  'untrusted-chain': 'critical',
+  'hostname-mismatch': 'critical',
+  'weak-protocol': 'warning',
+  'resolve-failed': 'info',
+  'probe-failed': 'info',
+};
+
 // Latest known result per tab, kept only for the life of this service worker instance —
 // feeds the content script's floating panel (see content.js) so it doesn't need to
 // re-request a check itself. Not persisted: worst case after a worker restart is the
@@ -92,18 +107,17 @@ function clearIndicators(tabId) {
 }
 
 function updateBadge(tabId, issues) {
-  const informational = issues.every((i) => i === 'resolve-failed' || i === 'probe-failed');
-  const critical = issues.filter((i) => i !== 'weak-protocol');
+  const levels = issues.map((i) => ISSUE_LEVELS[i] || 'warning');
 
   if (issues.length === 0) {
     chrome.action.setBadgeText({ tabId, text: 'OK' });
     chrome.action.setBadgeBackgroundColor({ tabId, color: '#2e7d32' });
-  } else if (informational) {
+  } else if (levels.every((l) => l === 'info')) {
     chrome.action.setBadgeText({ tabId, text: '?' });
     chrome.action.setBadgeBackgroundColor({ tabId, color: '#9e9e9e' });
   } else {
     chrome.action.setBadgeText({ tabId, text: String(issues.length) });
-    chrome.action.setBadgeBackgroundColor({ tabId, color: critical.length ? '#c62828' : '#f9a825' });
+    chrome.action.setBadgeBackgroundColor({ tabId, color: levels.includes('critical') ? '#c62828' : '#f9a825' });
   }
 }
 
