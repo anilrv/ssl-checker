@@ -241,8 +241,8 @@ code,
 }
 
 .flag {
-  width: auto;
-  height: 14px;
+  height: auto;
+  width: 24px;
   vertical-align: -3px;
   margin-right: 6px;
 }

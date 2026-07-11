@@ -225,6 +225,7 @@ function turnOff() {
 
 function attachDrag(host, handle, pos) {
   let dragging = false;
+  let moved = false;
   let startX = 0;
   let startY = 0;
   let startLeft = pos.left;
@@ -233,11 +234,12 @@ function attachDrag(host, handle, pos) {
   let curTop = pos.top;
 
   handle.addEventListener('pointerdown', (e) => {
-    // The handle may contain buttons/inputs (close, expand, opacity slider) — without this
-    // guard, interacting with any of them also starts a drag (the pointerdown bubbles up
-    // to the handle), and pointer-capture on the handle then swallows their own events.
+    // The handle may contain buttons/inputs (close, expand) — without this guard,
+    // interacting with any of them also starts a drag (the pointerdown bubbles up to the
+    // handle), and pointer-capture on the handle then swallows their own events.
     if (e.target.closest('button, input')) return;
     dragging = true;
+    moved = false;
     startX = e.clientX;
     startY = e.clientY;
     startLeft = curLeft;
@@ -247,6 +249,7 @@ function attachDrag(host, handle, pos) {
 
   handle.addEventListener('pointermove', (e) => {
     if (!dragging) return;
+    moved = true;
     curLeft = Math.max(0, Math.min(window.innerWidth - host.offsetWidth, startLeft + (e.clientX - startX)));
     curTop = Math.max(0, Math.min(window.innerHeight - 40, startTop + (e.clientY - startY)));
     host.style.left = curLeft + 'px';
@@ -256,7 +259,12 @@ function attachDrag(host, handle, pos) {
   handle.addEventListener('pointerup', (e) => {
     dragging = false;
     handle.releasePointerCapture(e.pointerId);
+    // Only an actual move pins (and persists) a position — a plain click on the handle
+    // must not freeze the default corner placement forever.
+    if (!moved) return;
     window.__sslCheckerFloatPos = { left: curLeft, top: curTop };
+    // Remember the placement across pages, tabs, and browser sessions.
+    if (extensionAlive()) chrome.storage.local.set({ floatViewPos: window.__sslCheckerFloatPos });
   });
 }
 
@@ -298,10 +306,7 @@ function renderCompact(host, shadow, pos) {
   const r = currentResult;
   const status = r ? overallStatus(r.issues) : 'checking';
   const bgRgb = STATUS_RGB[status] || STATUS_RGB.checking;
-  const tooltipParts = [];
-  if (r && r.geoCountry) tooltipParts.push(r.geoCountry);
-  if (r && r.dnsProviders && r.dnsProviders.length) tooltipParts.push(r.dnsProviders.join(', '));
-  const tooltipAttr = tooltipParts.length ? ` title="${escapeHtml(tooltipParts.join(' · '))}"` : '';
+
   shadow.innerHTML = `
     <style>
       ${SHARED_STYLES}
@@ -313,25 +318,37 @@ function renderCompact(host, shadow, pos) {
         -webkit-backdrop-filter: blur(14px) saturate(170%);
         border: 1px solid rgba(255,255,255,0.12);
       }
-      .content { position: relative; padding: 12px 34px 12px 16px; cursor: grab; }
+      .content { position: relative; padding: 10px 34px 10px 14px; cursor: grab; }
       .content:active { cursor: grabbing; }
+      /* Rarely-needed chrome: hidden until the pointer is over the panel (or a button has
+         keyboard focus), so the resting state is pure content. opacity (not display) keeps
+         them clickable mid-fade and focusable for keyboard users. */
       .button-stack {
         position: absolute; top: 8px; right: 8px;
         display: flex; flex-direction: column; gap: 3px;
+        opacity: 0; transition: opacity 0.15s;
       }
+      .panel:hover .button-stack, .button-stack:focus-within { opacity: 1; }
       .iconbtn { color: rgba(255,255,255,0.7); }
       .iconbtn:hover { color: #fff; background: rgba(255,255,255,0.16); }
       .iconbtn.close:hover { color: #fff; background: rgba(248,81,73,0.4); }
+      .header-line { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+      .glyph { flex: none; font-size: 11px; font-weight: 700; color: #fff; }
       .compact-flag {
-        position: absolute;
-        top: 50%;
-        left: 12px;
-        transform: translateY(-50%);
-        height: 15px;
+        flex: none;
+        width: 24px;
+        height: auto;
         border-radius: 2px;
         box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
       }
-      .rows { padding-left: 24px; }
+      .city {
+        flex: none; max-width: 45%; font-size: 10.5px; color: rgba(255,255,255,0.65);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .host {
+        flex: 1; min-width: 0; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
       .row { display: flex; gap: 8px; padding: 3px 0; align-items: baseline; }
       .label {
         flex: none; width: 44px; color: rgba(255,255,255,0.55); font-size: 9.5px; font-weight: 700;
@@ -342,21 +359,26 @@ function renderCompact(host, shadow, pos) {
         flex: 1; min-width: 0; font-size: 12px; font-weight: 600; color: #fff; line-height: 1.35;
         overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       }
-      .checking { font-size: 11.5px; color: rgba(255,255,255,0.75); padding-left: 24px; }
+      .checking { font-size: 11.5px; color: rgba(255,255,255,0.75); }
     </style>
     <div class="panel">
-      <div class="content" id="drag-handle"${tooltipAttr}>
+      <div class="content" id="drag-handle">
         <div class="button-stack">
           <button class="iconbtn" id="expand-btn" title="Expand" aria-label="Expand">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
           </button>
           <button class="iconbtn close" id="close-btn" title="Turn off floating view" aria-label="Turn off floating view">✕</button>
         </div>
-        ${r && r.geoCountryFlag ? `<img class="compact-flag" src="${escapeHtml(r.geoCountryFlag)}" alt="" />` : ''}
+        <div class="header-line">
+          <span class="glyph">${r ? sealGlyph(status) : '…'}</span>
+          ${r && r.geoCountryFlag ? `<img class="compact-flag" src="${escapeHtml(r.geoCountryFlag)}" alt="" />` : ''}
+          ${r && r.geoCity ? `<span class="city">${escapeHtml(r.geoCity)} ·</span>` : ''}
+          <span class="host">${escapeHtml(currentHostname)}</span>
+        </div>
         ${
           r
             ? `<div class="rows">${row('ORG', escapeHtml(r.org || '—'))}${row('ISSUER', escapeHtml(r.issuerOrg || '—'))}</div>`
-            : `<div class="checking">Checking ${escapeHtml(currentHostname)}…</div>`
+            : `<div class="checking">Checking…</div>`
         }
       </div>
     </div>
@@ -385,6 +407,9 @@ function renderFull(host, shadow, pos) {
       }
       .header { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; cursor: grab; }
       .header:active { cursor: grabbing; }
+      /* The panel is user-select:none so dragging (by the header) never smears a text
+         selection — but the body isn't a drag surface, so its content stays copyable. */
+      .body { user-select: text; }
       .seal {
         flex: none; width: 30px; height: 30px; border-radius: 50%;
         border: 2px solid #8b949e; color: #8b949e;
@@ -409,7 +434,7 @@ function renderFull(host, shadow, pos) {
       .value { flex: 1; min-width: 0; overflow-wrap: break-word; font-size: 12px; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
       .value a { color: #58a6ff; }
       .value a:hover { text-decoration: none; }
-      .flag { width: auto; height: 14px; vertical-align: -3px; margin-right: 6px; }
+      .flag { height: auto; width: 24px; vertical-align: -3px; margin-right: 6px; }
       #issues { padding: 4px 14px; }
       .issue { padding: 6px 8px; margin-bottom: 6px; border-left: 3px solid #8b949e; background: #161b22; border-radius: 0 4px 4px 0; font-size: 12px; }
       .issue.critical { border-color: #f85149; }
@@ -529,9 +554,16 @@ function requestResult() {
 }
 
 if (extensionAlive()) {
-  chrome.storage.local.get(['floatViewEnabled', 'floatViewCompact']).then((stored) => {
+  chrome.storage.local.get(['floatViewEnabled', 'floatViewCompact', 'floatViewPos']).then((stored) => {
     floatViewEnabled = !!stored.floatViewEnabled;
     compactMode = !!stored.floatViewCompact;
+    // Restore the last dragged position (persisted across sessions). renderPanel clamps it
+    // to the current viewport, so a spot saved on a large screen stays reachable on a
+    // smaller one.
+    const p = stored.floatViewPos;
+    if (p && typeof p.left === 'number' && typeof p.top === 'number') {
+      window.__sslCheckerFloatPos = p;
+    }
     if (floatViewEnabled) {
       renderPanel(); // shows the "Checking…" placeholder immediately
       requestResult();
@@ -550,6 +582,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (changes.floatViewCompact) {
     compactMode = !!changes.floatViewCompact.newValue;
+    needsRender = true;
+  }
+  if (changes.floatViewPos && changes.floatViewPos.newValue) {
+    // A drag in one tab repositions the panel in every tab, so it's already in the
+    // remembered spot when the user switches over.
+    window.__sslCheckerFloatPos = changes.floatViewPos.newValue;
     needsRender = true;
   }
 

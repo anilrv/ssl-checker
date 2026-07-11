@@ -122,6 +122,6 @@ function updateBadge(tabId, issues) {
 }
 
 function updateTooltip(tabId, result) {
-  const title = result.issuerOrg ? `${DEFAULT_TITLE} — ${result.issuerOrg}` : DEFAULT_TITLE;
+  const title = result.issuerOrg ? `SSL: ${result.issuerOrg}` : DEFAULT_TITLE;
   chrome.action.setTitle({ tabId, title });
 }
