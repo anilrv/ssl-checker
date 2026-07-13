@@ -14,6 +14,12 @@
   h1 { font-size: 22px; }
   code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; }
   a { color: #0969da; }
+  .install {
+    display: inline-block; margin: 10px 0 4px; padding: 10px 18px;
+    background: #1a7f37; color: #fff; border-radius: 8px;
+    font-weight: 600; text-decoration: none;
+  }
+  .install:hover { background: #166f30; }
   .footer { margin-top: 32px; color: #59636e; font-size: 13px; }
 </style>
 </head>
@@ -21,7 +27,8 @@
 <h1>SSL Issue Checker — backend service</h1>
 <p>This is the backend service for the <strong>SSL Issue Checker</strong> Chrome extension. It performs a live TLS handshake against the site you're viewing and reports its certificate's organization, issuer, validity, and any certificate issues (expired, self-signed, hostname mismatch, incomplete chain, untrusted root, or outdated TLS protocol support).</p>
 <p>This page isn't meant to be used directly — install the extension to check sites as you browse.</p>
-<p><a href="/api/privacy">Privacy Policy</a></p>
+<p><a class="install" href="https://chromewebstore.google.com/detail/ssl-issue-checker/ondenicnbkaepibppfhcafdlfidgfpbm">Install from the Chrome Web Store</a></p>
+<p><a href="/api/privacy">Privacy Policy</a> · <a href="https://github.com/anilrv/ssl-checker">Source on GitHub</a></p>
 <div class="footer">SSL Issue Checker</div>
 </body>
 </html>
