@@ -33,8 +33,8 @@ func check(host string) {
 		res.ALPNProtocol, res.OCSPStapled, res.SCTCount, res.HandshakeMs, res.ServerHeader, res.PoweredBy)
 
 	if geo := geoip.Lookup(ctx, ip); geo != nil {
-		fmt.Printf("geo: city=%q country=%q flag=%q asn=%q asName=%q\n",
-			geo.City, geo.Country, geo.CountryFlag, geo.ASN, geo.ASName)
+		fmt.Printf("geo: city=%q country=%q code=%q flag=%q flagData=%dB asn=%q asName=%q\n",
+			geo.City, geo.Country, geo.CountryCode, geo.CountryFlag, len(geo.CountryFlagData), geo.ASN, geo.ASName)
 	} else {
 		fmt.Println("geo: unavailable")
 	}

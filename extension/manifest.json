@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SSL Issue Checker",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0j8dCgGqbRqdAYGUwJO+QeCeFCdueYmnYowGX5OWt/c95kQ1Fg2kHAWBdjLr/rCGFqno5zCcdbiu9Amy55Eufk8h5dGHQ5rIjFX7/DmFBqtqhIDS+0edDw138zSAdQk/ArnZEZoq37FVXJhZ0MQHIi48LZqS2pgE0NMJZIFghC8GiQuCYhGKn89+RwbKjbf5y1YXwpdA5el+vDH+ILFgutqFRfIQIpssgbHsftRTqDPYiiKUqvzQT4Bg9nDuP6lzNOtp45pZSdIy7IKdQllClMFLiyxeA4DAqTi/I6sHtDY6pBvsfbyMAm/KLNFmFTlPKowkcmNUDxQCqKa68Q7BVQIDAQAB",
   "description": "Shows the SSL/TLS certificate organization and flags certificate issues for the current site.",
   "permissions": ["tabs", "storage"],

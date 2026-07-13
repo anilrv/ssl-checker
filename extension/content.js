@@ -159,13 +159,44 @@ function networkRow(r) {
   return row('Network', value);
 }
 
+// Flag rendering fallback chain: embedded data: URI (immune to COEP-isolated pages that
+// block cross-origin <img> loads, e.g. web.whatsapp.com) → remote URL (older backend
+// responses) → 2-letter country-code chip → nothing. The data-code attribute carries the
+// code so attachFlagFallbacks can swap a failed <img> for the chip after render.
+function flagHtml(r, cssClass) {
+  const src = r.geoCountryFlagData || r.geoCountryFlag;
+  const code = (r.geoCountryCode || '').toUpperCase();
+  if (src) {
+    return `<img class="${cssClass}" data-code="${escapeHtml(code)}" src="${escapeHtml(src)}" alt="" />`;
+  }
+  if (code) {
+    return `<span class="flag-code">${escapeHtml(code)}</span>`;
+  }
+  return '';
+}
+
+// Inline onerror= attributes would be subject to the host page's CSP, so the handlers
+// are attached programmatically after each render instead.
+function attachFlagFallbacks(shadow) {
+  shadow.querySelectorAll('img').forEach((img) => {
+    img.addEventListener('error', () => {
+      const code = img.dataset.code;
+      if (code) {
+        const chip = document.createElement('span');
+        chip.className = 'flag-code';
+        chip.textContent = code;
+        img.replaceWith(chip);
+      } else {
+        img.remove();
+      }
+    });
+  });
+}
+
 function locationRow(r) {
   if (!r.geoCountry) return '';
   const place = r.geoCity ? `${r.geoCity}, ${r.geoCountry}` : r.geoCountry;
-  const flag = r.geoCountryFlag
-    ? `<img class="flag" src="${escapeHtml(r.geoCountryFlag)}" alt="" />`
-    : '';
-  return row('Location', `${flag}${escapeHtml(place)}`);
+  return row('Location', `${flagHtml(r, 'flag')}${escapeHtml(place)}`);
 }
 
 const SHARED_STYLES = `
@@ -202,6 +233,12 @@ const SHARED_STYLES = `
   .iconbtn:focus { outline: none; }
   .iconbtn:focus-visible { outline: 2px solid rgba(255,255,255,0.4); outline-offset: 1px; }
   .muted-suffix { color: rgba(255,255,255,0.45); font-weight: 400; }
+  .flag-code {
+    flex: none; display: inline-block; padding: 1px 4px; margin-right: 6px;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
+    color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.15);
+    border-radius: 3px; vertical-align: 1px;
+  }
   .body::-webkit-scrollbar { width: 8px; }
   .body::-webkit-scrollbar-track { background: transparent; }
   .body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
@@ -333,6 +370,7 @@ function renderCompact(host, shadow, pos) {
       .iconbtn:hover { color: #fff; background: rgba(255,255,255,0.16); }
       .iconbtn.close:hover { color: #fff; background: rgba(248,81,73,0.4); }
       .header-line { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+      .header-line .flag-code { margin-right: 0; }
       .glyph { flex: none; font-size: 11px; font-weight: 700; color: #fff; }
       .compact-flag {
         flex: none;
@@ -371,7 +409,7 @@ function renderCompact(host, shadow, pos) {
         </div>
         <div class="header-line">
           <span class="glyph">${r ? sealGlyph(status) : '…'}</span>
-          ${r && r.geoCountryFlag ? `<img class="compact-flag" src="${escapeHtml(r.geoCountryFlag)}" alt="" />` : ''}
+          ${r ? flagHtml(r, 'compact-flag') : ''}
           ${r && r.geoCity ? `<span class="city">${escapeHtml(r.geoCity)} ·</span>` : ''}
           <span class="host">${escapeHtml(currentHostname)}</span>
         </div>
@@ -386,6 +424,7 @@ function renderCompact(host, shadow, pos) {
 
   shadow.getElementById('expand-btn').addEventListener('click', () => setCompact(false));
   shadow.getElementById('close-btn').addEventListener('click', turnOff);
+  attachFlagFallbacks(shadow);
 
   attachDrag(host, shadow.getElementById('drag-handle'), pos);
 }
@@ -526,6 +565,7 @@ function renderFull(host, shadow, pos) {
 
   shadow.getElementById('compact-btn').addEventListener('click', () => setCompact(true));
   shadow.getElementById('close-btn').addEventListener('click', turnOff);
+  attachFlagFallbacks(shadow);
 
   attachDrag(host, shadow.getElementById('drag-handle'), pos);
 }

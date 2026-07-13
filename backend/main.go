@@ -111,10 +111,14 @@ type CheckResult struct {
 	PoweredBy    string `json:"poweredBy,omitempty"`
 
 	GeoCountry     string `json:"geoCountry,omitempty"`
+	GeoCountryCode string `json:"geoCountryCode,omitempty"`
 	GeoCity        string `json:"geoCity,omitempty"`
-	GeoCountryFlag string `json:"geoCountryFlag,omitempty"`
-	GeoAsn         string `json:"geoAsn,omitempty"`
-	GeoAsName      string `json:"geoAsName,omitempty"`
+	GeoCountryFlag string `json:"geoCountryFlag,omitempty"` // kept for older extension versions
+	// The flag as a data: URI — what current extensions render, since cross-origin-
+	// isolated pages (COEP) block direct <img> loads from ipgeolocation.io.
+	GeoCountryFlagData string `json:"geoCountryFlagData,omitempty"`
+	GeoAsn             string `json:"geoAsn,omitempty"`
+	GeoAsName          string `json:"geoAsName,omitempty"`
 
 	RegistrarName         string   `json:"registrarName,omitempty"`
 	DomainCreated         int64    `json:"domainCreated,omitempty"`
@@ -354,7 +358,7 @@ func clientIPFrom(r *http.Request) string {
 	return r.RemoteAddr
 }
 
-func writeJSON(w http.ResponseWriter, status int, v interface{}) {
+func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
@@ -427,8 +431,10 @@ func performCheck(ctx context.Context, hostname string) CheckResult {
 
 	if geo := <-geoCh; geo != nil {
 		result.GeoCountry = geo.Country
+		result.GeoCountryCode = geo.CountryCode
 		result.GeoCity = geo.City
 		result.GeoCountryFlag = geo.CountryFlag
+		result.GeoCountryFlagData = geo.CountryFlagData
 		result.GeoAsn = geo.ASN
 		result.GeoAsName = geo.ASName
 	}

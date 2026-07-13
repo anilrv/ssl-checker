@@ -138,9 +138,17 @@ function networkRow(result) {
 function locationRow(result) {
   if (!result.geoCountry) return '';
   const place = result.geoCity ? `${result.geoCity}, ${result.geoCountry}` : result.geoCountry;
-  const flag = result.geoCountryFlag
-    ? `<img class="flag" src="${escapeHtml(result.geoCountryFlag)}" alt="" />`
-    : '';
+  // Prefer the backend-embedded data: URI (no third-party request from the popup at
+  // all); fall back to the remote URL for older cached responses, then to a 2-letter
+  // country-code chip if there's no image.
+  const src = result.geoCountryFlagData || result.geoCountryFlag;
+  const code = (result.geoCountryCode || '').toUpperCase();
+  let flag = '';
+  if (src) {
+    flag = `<img class="flag" src="${escapeHtml(src)}" alt="" />`;
+  } else if (code) {
+    flag = `<span class="flag-code">${escapeHtml(code)}</span>`;
+  }
   return row('Location', `${flag}${escapeHtml(place)}`, 'mono');
 }
 
@@ -339,6 +347,27 @@ floatViewBtn.addEventListener('click', async () => {
 chrome.storage.local.get('floatViewEnabled').then(({ floatViewEnabled }) => {
   setFloatViewButtonState(!!floatViewEnabled);
 });
+
+// Chrome forbids content scripts on the Web Store (and non-https pages never match the
+// content script), so the floating panel can't exist there — disable the toggle with an
+// explanation instead of letting it look broken.
+(async function disableFloatViewWhereUnavailable() {
+  const tab = await getActiveTab();
+  let unavailable = true;
+  try {
+    const u = new URL(tab.url);
+    unavailable =
+      u.protocol !== 'https:' ||
+      u.hostname === 'chromewebstore.google.com' ||
+      u.hostname === 'chrome.google.com';
+  } catch (e) {
+    // unparseable URL (chrome:// pages etc.) — leave unavailable
+  }
+  if (unavailable) {
+    floatViewBtn.disabled = true;
+    floatViewBtn.title = "Floating view isn't available on this page";
+  }
+})();
 
 // The popup can stay open across a same-tab navigation (typing a new URL, clicking a
 // link, back/forward) — without this listener it would keep showing the previous

@@ -181,6 +181,16 @@ code,
   border-color: var(--accent);
 }
 
+#float-view:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#float-view:disabled:hover {
+  color: var(--muted);
+  border-color: var(--hairline);
+}
+
 #rescan.spinning svg {
   animation: spin 700ms linear infinite;
 }
@@ -245,6 +255,19 @@ code,
   width: 24px;
   vertical-align: -3px;
   margin-right: 6px;
+}
+
+.flag-code {
+  display: inline-block;
+  padding: 1px 4px;
+  margin-right: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  vertical-align: 1px;
 }
 
 .value.fingerprint {
