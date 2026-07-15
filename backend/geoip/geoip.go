@@ -17,7 +17,14 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"sslcheckerfunc/durablecache"
 )
+
+const cacheTable = "sslcheckercache"
+const cachePartition = "geoip"
+const flagsTable = "sslcheckerflags"
+const flagsPartition = "flag"
 
 type Info struct {
 	Country         string
@@ -102,7 +109,9 @@ func (c *geoCache) Set(key string, info Info) {
 	}
 }
 
-var cache = newGeoCache(500, 7*24*time.Hour)
+const cacheTTL = 7 * 24 * time.Hour
+
+var cache = newGeoCache(500, cacheTTL)
 
 var httpClient = &http.Client{}
 
@@ -113,6 +122,10 @@ var httpClient = &http.Client{}
 func Lookup(ctx context.Context, ip net.IP) *Info {
 	key := ip.String()
 	if info, ok := cache.Get(key); ok {
+		return &info
+	}
+	if info, ok := durablecache.Get[Info](ctx, cacheTable, cachePartition, key); ok {
+		cache.Set(key, info)
 		return &info
 	}
 
@@ -167,6 +180,7 @@ func Lookup(ctx context.Context, ip net.IP) *Info {
 		ASName:          body.ASN.Organization,
 	}
 	cache.Set(key, info)
+	go durablecache.Set(context.Background(), cacheTable, cachePartition, key, info, cacheTTL)
 	return &info
 }
 
@@ -202,6 +216,17 @@ func fetchFlagData(flagURL string) string {
 	if ok {
 		return cached
 	}
+	// Durable second tier: only ~250 distinct country flags exist, so once one is captured
+	// here it never needs to be re-fetched from the flag host again, even across cold
+	// starts — stored with no TTL (see Set's ttl <= 0 semantics).
+	if uri, ok := durablecache.Get[string](context.Background(), flagsTable, flagsPartition, flagURL); ok {
+		flagMu.Lock()
+		if len(flagCache) < flagCacheCap {
+			flagCache[flagURL] = uri
+		}
+		flagMu.Unlock()
+		return uri
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -234,5 +259,6 @@ func fetchFlagData(flagURL string) string {
 		flagCache[flagURL] = uri
 	}
 	flagMu.Unlock()
+	go durablecache.Set(context.Background(), flagsTable, flagsPartition, flagURL, uri, 0)
 	return uri
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/azure/azure-functions-golang-worker/worker"
 
 	"sslcheckerfunc/certprobe"
+	"sslcheckerfunc/durablecache"
 	"sslcheckerfunc/geoip"
 	"sslcheckerfunc/ssrfguard"
 	"sslcheckerfunc/whois"
@@ -242,6 +243,17 @@ func (c *resultCache) Set(key string, result CheckResult) {
 
 var resultsCache = newResultCache(500, 24*time.Hour)
 
+const resultsCacheTTL = 24 * time.Hour
+
+// ---- durable L2 layer (Azure Table Storage) behind the in-memory cache above ----
+// Flex Consumption scales to zero when idle and scales out under load, wiping/fragmenting
+// the in-memory LRU far more often than its 24h TTL implies. This durable layer, backed by
+// the storage account Azure already requires (AzureWebJobsStorage), lets a cold or
+// newly-scaled instance reuse a result another instance already computed.
+
+const resultsCacheTable = "sslcheckercache"
+const resultsCachePartition = "results"
+
 // ---- HTTP handler ----
 
 func checkSSLHandler(w http.ResponseWriter, r *http.Request) {
@@ -267,18 +279,29 @@ func checkSSLHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+
 	if r.URL.Query().Get("force") != "1" {
 		if cached, ok := resultsCache.Get(hostname); ok {
 			writeJSON(w, http.StatusOK, cached)
 			return
 		}
+		if cached, ok := durablecache.Get[CheckResult](ctx, resultsCacheTable, resultsCachePartition, hostname); ok {
+			resultsCache.Set(hostname, cached)
+			writeJSON(w, http.StatusOK, cached)
+			return
+		}
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-
 	result := performCheck(ctx, hostname)
-	resultsCache.Set(hostname, result)
+	// Only cache successful results — durably persisting a transient failure (e.g. a DNS
+	// blip) for the full TTL across every instance would be a much bigger footgun than the
+	// old in-memory-only behavior this replaces.
+	if result.Error == "" {
+		resultsCache.Set(hostname, result)
+		go durablecache.Set(context.Background(), resultsCacheTable, resultsCachePartition, hostname, result, resultsCacheTTL)
+	}
 	writeJSON(w, http.StatusOK, result)
 }
 

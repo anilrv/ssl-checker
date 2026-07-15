@@ -14,7 +14,12 @@ import (
 	"time"
 
 	"golang.org/x/net/publicsuffix"
+
+	"sslcheckerfunc/durablecache"
 )
+
+const cacheTable = "sslcheckercache"
+const cachePartition = "whois"
 
 type Info struct {
 	RegistrarName     string
@@ -98,7 +103,13 @@ func (c *whoisCache) Set(key string, info Info) {
 	}
 }
 
-var cache = newWhoisCache(500, 24*time.Hour)
+// Registration data barely changes day-to-day, and persistence (see durablecache below) is
+// what finally makes a long TTL pay off against whoisjson.com's tight 1000-request/month
+// budget (~33/day) — a short TTL only mattered when the cache was purely in-memory and
+// wiped on every cold start anyway.
+const cacheTTL = 30 * 24 * time.Hour
+
+var cache = newWhoisCache(500, cacheTTL)
 
 var httpClient = &http.Client{}
 
@@ -129,6 +140,10 @@ func Lookup(ctx context.Context, hostname string) *Info {
 	}
 
 	if info, ok := cache.Get(domain); ok {
+		return &info
+	}
+	if info, ok := durablecache.Get[Info](ctx, cacheTable, cachePartition, domain); ok {
+		cache.Set(domain, info)
 		return &info
 	}
 
@@ -176,5 +191,6 @@ func Lookup(ctx context.Context, hostname string) *Info {
 	}
 
 	cache.Set(domain, info)
+	go durablecache.Set(context.Background(), cacheTable, cachePartition, domain, info, cacheTTL)
 	return &info
 }

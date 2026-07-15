@@ -21,7 +21,7 @@
 </head>
 <body>
 <h1>Privacy Policy — SSL Issue Checker</h1>
-<p class="updated">Last updated: 2026-07-11</p>
+<p class="updated">Last updated: 2026-07-15</p>
 
 <p>SSL Issue Checker is a Chrome extension that checks the TLS/SSL certificate of the site in your active browser tab and reports its organization, issuer, validity, and any certificate issues, along with additional hosting and domain-registration details described below.</p>
 
@@ -47,7 +47,7 @@
   <li><strong><a href="https://ipgeolocation.io/" target="_blank" rel="noopener noreferrer">ipgeolocation.io</a></strong> — our backend sends the site's resolved server IP address to look up its approximate location (country/city) and network operator (ASN). Your own IP address is never sent to this or any other third party.</li>
   <li><strong><a href="https://whoisjson.com/" target="_blank" rel="noopener noreferrer">whoisjson.com</a></strong> — our backend sends the site's registrable domain name to look up public WHOIS registration data (registrar, registration/expiry dates, DNS provider, registered owner organization).</li>
 </ul>
-<p>Both lookups are cached on our backend (server IPs for up to 7 days, domains for up to 24 hours) purely to reduce repeat calls, and neither provider receives any information about you, your browser, or your IP address — only the hostname/IP already being checked.</p>
+<p>Both lookups are cached on our backend (server IPs for up to 7 days, domains for up to 30 days) purely to reduce repeat calls, and neither provider receives any information about you, your browser, or your IP address — only the hostname/IP already being checked.</p>
 
 <h2>Infrastructure and service providers</h2>
 <p>For full transparency, this service runs on the following infrastructure. None of these providers receive more than what's described, and none are used for analytics or advertising:</p>
@@ -61,7 +61,7 @@
 <ul>
   <li>The extension stores its access token locally on your device via <code>chrome.storage.local</code> — this never leaves your device except when presented back to the backend to authenticate a check request.</li>
   <li>Whether you've turned floating view on or off is also stored locally via <code>chrome.storage.local</code>.</li>
-  <li>The backend keeps a short-lived, in-memory cache of recent check results (hostname and certificate metadata, up to 24 hours) purely to avoid re-checking the same site repeatedly. It is not tied to your identity, browser, or IP address, and there is no persistent logging or analytics platform attached to it.</li>
+  <li>The backend keeps a short-lived cache of recent check results and the lookups above (hostname/IP/domain and the resulting certificate, hosting, and registration metadata — up to 24 hours for check results, 7 days for network/location data, and 30 days for domain-registration data), purely to avoid re-checking the same site repeatedly. This cache is stored in Azure Table Storage under the same Microsoft Azure account already described in "Infrastructure and service providers" above, so it can survive the backend restarting. It is not tied to your identity, browser, or IP address, and there is no analytics or logging platform attached to it — only the same bounded cache described here.</li>
 </ul>
 
 <h2>Permissions justification</h2>
