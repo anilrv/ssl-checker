@@ -1,6 +1,6 @@
 # Privacy Policy — SSL Issue Checker
 
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-19_
 
 > This file mirrors the canonical policy served at
 > <https://ssl-checker.anilrv.in/api/privacy> (authored in `backend/privacy.html`).
@@ -24,12 +24,13 @@ SSL Issue Checker is a Chrome extension that checks the TLS/SSL certificate of t
 
 ## Additional lookups performed by our backend
 
-To show hosting and domain-registration details (server software, network/ASN, approximate server location, registrar, DNS provider), our backend — never the extension directly — makes two further lookups against third-party data providers. These are public infrastructure/registration lookups about the _site's server or domain_, not about you:
+To show hosting and domain-registration details (server software, network/ASN, approximate server location, registrar, DNS provider) and to check certificate revocation, our backend — never the extension directly — makes further lookups against third-party services. These are public infrastructure/registration lookups about the _site's server, domain, or certificate_, not about you:
 
 - **[ipgeolocation.io](https://ipgeolocation.io/)** — our backend sends the site's resolved server IP address to look up its approximate location (country/city) and network operator (ASN). Your own IP address is never sent to this or any other third party.
 - **[whoisjson.com](https://whoisjson.com/)** — our backend sends the site's registrable domain name to look up public WHOIS registration data (registrar, registration/expiry dates, DNS provider, registered owner organization).
+- **Certificate authority revocation services (OCSP/CRL)** — to check whether the site's certificate has been revoked, our backend queries the revocation endpoints published inside that certificate: the issuing certificate authority's OCSP responder and/or its certificate revocation list (CRL). Which authority receives the query depends on who issued the site's certificate (e.g. Let's Encrypt, DigiCert). The query identifies only the certificate being checked (its serial number and issuer), originates from our backend, and carries nothing about you, your browser, or your IP address.
 
-Both lookups are cached on our backend (server IPs for up to 7 days, domains for up to 24 hours) purely to reduce repeat calls, and neither provider receives any information about you, your browser, or your IP address — only the hostname/IP already being checked.
+These lookups are cached on our backend (server IPs for up to 7 days, domains for up to 30 days, CA revocation lists for up to 6 hours) purely to reduce repeat calls, and none of these services receive any information about you, your browser, or your IP address — only the hostname, IP, or certificate already being checked.
 
 ## Infrastructure and service providers
 
@@ -43,7 +44,7 @@ For full transparency, this service runs on the following infrastructure. None o
 
 - The extension stores its access token locally on your device via `chrome.storage.local` — this never leaves your device except when presented back to the backend to authenticate a check request.
 - Whether you've turned floating view on or off is also stored locally via `chrome.storage.local`.
-- The backend keeps a short-lived, in-memory cache of recent check results (hostname and certificate metadata, up to 24 hours) purely to avoid re-checking the same site repeatedly. It is not tied to your identity, browser, or IP address, and there is no persistent logging or analytics platform attached to it.
+- The backend keeps a short-lived cache of recent check results and the lookups above (hostname/IP/domain and the resulting certificate, hosting, and registration metadata — up to 24 hours for check results, 7 days for network/location data, and 30 days for domain-registration data), purely to avoid re-checking the same site repeatedly. This cache is stored in Azure Table Storage under the same Microsoft Azure account already described in "Infrastructure and service providers" above, so it can survive the backend restarting. It is not tied to your identity, browser, or IP address, and there is no analytics or logging platform attached to it — only the same bounded cache described here.
 
 ## Permissions justification
 
