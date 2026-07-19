@@ -103,6 +103,12 @@ type CheckResult struct {
 	ChainVerified bool   `json:"chainVerified,omitempty"`
 	ChainError    string `json:"chainError,omitempty"`
 
+	SignatureAlgorithm string `json:"signatureAlgorithm,omitempty"`
+	KeyType            string `json:"keyType,omitempty"`
+	KeyBits            int    `json:"keyBits,omitempty"`
+	RevocationStatus   string `json:"revocationStatus,omitempty"` // "good" | "revoked" | "unknown"
+	RevocationSource   string `json:"revocationSource,omitempty"` // "stapled-ocsp" | "ocsp" | "crl"
+
 	ALPNProtocol string `json:"alpnProtocol,omitempty"`
 	HTTP2        bool   `json:"http2,omitempty"`
 	OCSPStapled  bool   `json:"ocspStapled,omitempty"`
@@ -157,6 +163,9 @@ var issueCatalog = map[string]IssueDetail{
 	"untrusted-chain":      {Label: "Chain doesn't lead to a trusted root CA", Level: "critical"},
 	"hostname-mismatch":    {Label: "Certificate does not cover this site's hostname", Level: "critical"},
 	"weak-protocol":        {Label: "Server still accepts an outdated TLS protocol (TLS 1.0)", Level: "warning"},
+	"revoked":              {Label: "Certificate has been revoked by its issuer", Level: "critical"},
+	"weak-signature":       {Label: "Certificate is signed with a weak algorithm (SHA-1/MD5)", Level: "warning"},
+	"weak-key":             {Label: "Certificate uses a weak RSA key (under 2048 bits)", Level: "warning"},
 	"recently-registered":  {Label: "Domain was registered less than 10 days ago", Level: "critical"},
 	"young-domain":         {Label: "Domain was registered less than 30 days ago", Level: "warning"},
 	"cert-expiring-soon":   {Label: "Certificate expires within 14 days", Level: "warning"},
@@ -308,6 +317,7 @@ const domainAgeCritical = 10 * 24 * time.Hour   // recently-registered: domain y
 const domainAgeWarning = 30 * 24 * time.Hour    // young-domain: domain younger than this (yellow)
 const certExpiryWarning = 14 * 24 * time.Hour   // cert-expiring-soon: NotAfter within this window
 const domainExpiryWarning = 14 * 24 * time.Hour // domain-expiring-soon: DomainExpires within this window
+const minRSAKeyBits = 2048                      // weak-key: RSA below this
 
 // cappedTTL returns base reduced to the time remaining until the earliest non-zero
 // deadline, floored at minCacheTTL once that remaining time reaches zero. A copy of
@@ -585,6 +595,9 @@ func performCheck(ctx context.Context, hostname string) CheckResult {
 	result.ChainComplete = probe.ChainComplete
 	result.ChainVerified = probe.ChainVerified
 	result.ChainError = probe.ChainVerifyError
+	result.SignatureAlgorithm = probe.SignatureAlgorithm
+	result.KeyType = probe.KeyType
+	result.KeyBits = probe.KeyBits
 
 	result.ALPNProtocol = probe.ALPNProtocol
 	result.HTTP2 = probe.ALPNProtocol == "h2"
@@ -618,7 +631,16 @@ func performCheck(ctx context.Context, hostname string) CheckResult {
 		}
 	}
 
+	// Revocation involves its own network fetches (OCSP responder / CRL), so it runs
+	// concurrently with the legacy-protocol probe instead of adding to it. It mutates
+	// probe in place; the channel is buffered so the goroutine can't leak.
+	revDone := make(chan struct{}, 1)
+	go func() { certprobe.CheckRevocation(ctx, probe); revDone <- struct{}{} }()
 	weakProtocol := certprobe.SupportsLegacyProtocol(ctx, ip, hostname, tls.VersionTLS10)
+	<-revDone
+	result.RevocationStatus = probe.RevocationStatus
+	result.RevocationSource = probe.RevocationSource
+
 	setIssues(&result, computeIssues(&result, probe, weakProtocol))
 	return result
 }
@@ -671,6 +693,19 @@ func computeIssues(result *CheckResult, probe *certprobe.Result, weakProtocol bo
 
 	if weakProtocol {
 		issues = append(issues, "weak-protocol")
+	}
+
+	// Only a definitive revoked verdict is reported — "good" and "couldn't determine"
+	// are both silent (see certprobe.CheckRevocation for why silence is correct there).
+	if probe.RevocationStatus == certprobe.RevocationRevoked {
+		issues = append(issues, "revoked")
+	}
+
+	if probe.WeakSignature {
+		issues = append(issues, "weak-signature")
+	}
+	if probe.KeyType == "RSA" && probe.KeyBits > 0 && probe.KeyBits < minRSAKeyBits {
+		issues = append(issues, "weak-key")
 	}
 
 	// Domain age is a phishing/typosquat signal, tiered: red inside 10 days, yellow

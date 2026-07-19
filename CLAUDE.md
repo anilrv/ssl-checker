@@ -97,6 +97,24 @@ already does that.
   bug (Server header silently empty for every h2 site, i.e. most of the modern web) before
   the branch existed — if you touch this function, keep both paths and test against an h2
   site (e.g. `www.google.com`) and a `http/1.1` one (e.g. `self-signed.badssl.com`).
+- **The backend owns issue metadata.** `issueCatalog` in `main.go` maps every issue code
+  to its label and severity, and `setIssues` ships them per-result as `issueDetails`
+  alongside the bare `issues` codes. The extension renders from `issueDetails` and treats
+  its own JS maps as fallback only (for its client-side `no-https` code and rows cached
+  before the field existed) — so **a new rule is a backend-only deploy**: add the catalog
+  entry and the rule in `computeIssues`, never touch the extension maps. If a rule is
+  time-based, also add its threshold-crossing instant to `resultTTL` as a **future-only**
+  deadline (`futureDeadline`) — passing an already-crossed threshold into `cappedTTL`
+  would floor virtually every mature result to the 5-minute minimum.
+- **Revocation checking is three-step and paranoid about its URLs**
+  (`certprobe/revocation.go`): stapled OCSP → live OCSP → CRL, best-effort like
+  geoip/whois, and only a definitive verdict is reported ("couldn't determine" stays
+  silent — an unreachable responder is not evidence). Two things are easy to get wrong
+  here: (1) OCSP/CRL URLs come out of the probed certificate, i.e. they're
+  attacker-influenced, so every fetch resolves through `ssrfguard`, dials the vetted IP
+  directly, and refuses redirects; (2) **Let's Encrypt shut down OCSP in August 2025**,
+  so for the web's largest CA the CRL path is the only one that works — don't "simplify"
+  it away. Test against `revoked.badssl.com` (an LE cert, exercises exactly that path).
 
 ### Build, test, deploy
 

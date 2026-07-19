@@ -36,10 +36,11 @@ func TestHandlerRealSites(t *testing.T) {
 		wantIssue    string
 		wantNoIssues []string
 	}{
-		{host: "github.com", wantNoIssues: []string{"expired", "recently-registered", "young-domain"}},
+		{host: "github.com", wantNoIssues: []string{"expired", "recently-registered", "young-domain", "revoked"}},
 		{host: "expired.badssl.com", wantIssue: "expired"},
 		{host: "self-signed.badssl.com", wantIssue: "self-signed"},
 		{host: "wrong.host.badssl.com", wantIssue: "hostname-mismatch"},
+		{host: "revoked.badssl.com", wantIssue: "revoked"},
 	}
 	for _, c := range cases {
 		result := doCheck(t, c.host)
@@ -237,12 +238,64 @@ func TestComputeIssuesDomainExpiringSoon(t *testing.T) {
 	}
 }
 
+func TestComputeIssuesRevoked(t *testing.T) {
+	now := time.Now()
+	for _, c := range []struct {
+		status string
+		want   bool
+	}{
+		{certprobe.RevocationRevoked, true},
+		{certprobe.RevocationGood, false},
+		{certprobe.RevocationUnknown, false},
+		{"", false},
+	} {
+		probe := healthyProbe(now)
+		probe.RevocationStatus = c.status
+		issues := computeIssues(&CheckResult{Hostname: "example.com"}, probe, false)
+		if got := contains(issues, "revoked"); got != c.want {
+			t.Errorf("status %q: revoked=%v, want %v (issues %v)", c.status, got, c.want, issues)
+		}
+	}
+}
+
+func TestComputeIssuesWeakCrypto(t *testing.T) {
+	now := time.Now()
+
+	probe := healthyProbe(now)
+	probe.WeakSignature = true
+	if issues := computeIssues(&CheckResult{Hostname: "example.com"}, probe, false); !contains(issues, "weak-signature") {
+		t.Errorf("weak signature: expected weak-signature, got %v", issues)
+	}
+
+	cases := []struct {
+		name    string
+		keyType string
+		keyBits int
+		want    bool
+	}{
+		{"RSA 1024", "RSA", 1024, true},
+		{"RSA 2048", "RSA", 2048, false},
+		{"ECDSA 256", "ECDSA", 256, false},
+		{"unknown key", "", 0, false},
+	}
+	for _, c := range cases {
+		probe := healthyProbe(now)
+		probe.KeyType = c.keyType
+		probe.KeyBits = c.keyBits
+		issues := computeIssues(&CheckResult{Hostname: "example.com"}, probe, false)
+		if got := contains(issues, "weak-key"); got != c.want {
+			t.Errorf("%s: weak-key=%v, want %v (issues %v)", c.name, got, c.want, issues)
+		}
+	}
+}
+
 func TestIssueCatalogAndSetIssues(t *testing.T) {
 	// Every code any backend path can emit; keep in step with computeIssues and the
 	// resolve-failed/probe-failed paths in performCheck.
 	emitted := []string{
 		"expired", "not-yet-valid", "self-signed", "incomplete-chain", "untrusted-chain",
-		"hostname-mismatch", "weak-protocol", "recently-registered", "young-domain",
+		"hostname-mismatch", "weak-protocol", "revoked", "weak-signature", "weak-key",
+		"recently-registered", "young-domain",
 		"cert-expiring-soon", "domain-expiring-soon", "resolve-failed", "probe-failed",
 	}
 	validLevels := map[string]bool{"critical": true, "warning": true, "info": true}

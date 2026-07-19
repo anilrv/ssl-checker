@@ -8,6 +8,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -49,6 +52,27 @@ type Result struct {
 	// (e.g. a company running its own subordinate CA for its own domains).
 	LeafSelfSigned bool
 
+	// Leaf key/signature details for the weak-crypto rules (and display). The weakness
+	// CLASSIFICATION lives here because it's x509 knowledge; the POLICY of turning it
+	// into an issue lives in the caller, matching the LeafSelfSigned pattern above.
+	SignatureAlgorithm string // e.g. "SHA256-RSA" (x509.SignatureAlgorithm.String())
+	WeakSignature      bool   // leaf signed with an MD2/MD5/SHA-1-based algorithm
+	KeyType            string // "RSA", "ECDSA", "Ed25519"; "" if unrecognized
+	KeyBits            int    // RSA modulus bits / ECDSA curve bits / 256 for Ed25519; 0 if unknown
+
+	// Raw material for CheckRevocation (revocation.go): the leaf, the presented
+	// intermediate that actually signed it (nil when the server sent none — no
+	// revocation evidence can be validated without it), and the OCSP response stapled
+	// during the handshake, kept verbatim so it can be parsed without a re-handshake.
+	Leaf          *x509.Certificate
+	Issuer        *x509.Certificate
+	RawOCSPStaple []byte
+
+	// Filled by CheckRevocation, not Probe: "good" | "revoked" | "unknown", empty when
+	// the check couldn't run or nothing definitive came back.
+	RevocationStatus string
+	RevocationSource string // "stapled-ocsp" | "ocsp" | "crl"
+
 	// The fields below come free from the same handshake (ALPN/OCSP/SCT), or from a
 	// single lightweight HTTP request reusing the already-open TLS connection (Server/
 	// PoweredBy) — never a second connection. All best-effort: a failure just leaves
@@ -82,6 +106,44 @@ func firstOrEmpty(list []string) string {
 		return ""
 	}
 	return list[0]
+}
+
+// weakSignatureAlgorithm reports whether alg is based on a broken hash (MD2/MD5/SHA-1).
+// Public CAs stopped issuing these years ago, so in practice this fires on self-signed
+// and private-CA certificates — which is exactly where a checker still adds value.
+func weakSignatureAlgorithm(alg x509.SignatureAlgorithm) bool {
+	switch alg {
+	case x509.MD2WithRSA, x509.MD5WithRSA, x509.SHA1WithRSA, x509.DSAWithSHA1, x509.ECDSAWithSHA1:
+		return true
+	}
+	return false
+}
+
+// publicKeyInfo classifies a leaf public key for the weak-key rule. Unrecognized key
+// types (including long-dead DSA) come back as ("", 0) and are simply not judged.
+func publicKeyInfo(pub any) (keyType string, bits int) {
+	switch k := pub.(type) {
+	case *rsa.PublicKey:
+		return "RSA", k.N.BitLen()
+	case *ecdsa.PublicKey:
+		return "ECDSA", k.Curve.Params().BitSize
+	case ed25519.PublicKey:
+		return "Ed25519", 256
+	}
+	return "", 0
+}
+
+// leafIssuer picks the presented certificate that actually signed the leaf — a
+// cryptographic check, not a subject/issuer name comparison, for the same reason as
+// isSelfSigned below. Returns nil when the server presented no usable issuer.
+func leafIssuer(certs []*x509.Certificate) *x509.Certificate {
+	leaf := certs[0]
+	for _, c := range certs[1:] {
+		if leaf.CheckSignatureFrom(c) == nil {
+			return c
+		}
+	}
+	return nil
 }
 
 // isSelfSigned checks pure cryptographic self-signature (does this cert's own public
@@ -163,6 +225,7 @@ func Probe(ctx context.Context, ip net.IP, hostname string) (*Result, error) {
 	leaf := state.PeerCertificates[0]
 
 	complete, verified, verifyErr := verifyChain(state.PeerCertificates)
+	keyType, keyBits := publicKeyInfo(leaf.PublicKey)
 
 	result := &Result{
 		SubjectOrg:  firstOrEmpty(leaf.Subject.Organization),
@@ -181,6 +244,15 @@ func Probe(ctx context.Context, ip net.IP, hostname string) (*Result, error) {
 		ChainVerifyError: verifyErr,
 
 		LeafSelfSigned: isSelfSigned(leaf),
+
+		SignatureAlgorithm: leaf.SignatureAlgorithm.String(),
+		WeakSignature:      weakSignatureAlgorithm(leaf.SignatureAlgorithm),
+		KeyType:            keyType,
+		KeyBits:            keyBits,
+
+		Leaf:          leaf,
+		Issuer:        leafIssuer(state.PeerCertificates),
+		RawOCSPStaple: state.OCSPResponse,
 
 		ALPNProtocol: state.NegotiatedProtocol,
 		OCSPStapled:  len(state.OCSPResponse) > 0,
