@@ -8,19 +8,40 @@ Check the current site's TLS certificate — organization, issuer, validity, and
 
 ## Detailed description
 
-SSL Issue Checker inspects the TLS/SSL certificate of the site in your active tab and shows:
+SSL Issue Checker inspects the TLS/SSL certificate of the site in your active tab — with a live, real TLS handshake, not a cached third-party lookup — and shows you everything that matters at a glance.
 
-- The certificate's Organization and Issuer
-- Validity dates (when it was issued, when it expires, with day counts)
-- The negotiated TLS protocol and cipher suite
-- Certificate chain completeness and trust status
-- Flagged issues: expired, not-yet-valid, self-signed, hostname mismatch, incomplete certificate chain, untrusted root, and outdated (TLS 1.0) protocol support
+WHAT IT SHOWS
 
-This extension does a **live, real TLS handshake** to the site (not a cached third-party lookup), performed by a backend service the developer operates. No setup is required — the extension configures itself automatically on first use.
+SSL / Certificate
+• Organization and Issuer of the certificate
+• Validity dates — when it was issued and when it expires, with friendly durations ("in 2m 20d")
+• Negotiated TLS protocol and cipher suite
+• Certificate chain length, completeness, and trust status
+• OCSP stapling, TLS handshake time, and the hostnames the certificate covers
 
-No browsing history, page content, or personal data is collected. Only the bare hostname of the active tab (never the full URL) is sent to the developer's backend to perform the check.
+Hosting
+• Server software (Server / X-Powered-By headers) and HTTP/2 support
+• Approximate server location (city and country, with a flag)
+• Network operator (ASN), linked to Cloudflare Radar
 
-You can also turn on an optional floating view from the popup: a small draggable panel showing the same result (organization, issuer, issues), rendered on the page itself and following you across normal browsing until you turn it off.
+Domain
+• Registrar and domain registration/expiry dates
+• Detected DNS provider and registered owner organization
+
+ISSUES, CALLED OUT CLEARLY
+
+Expired or not-yet-valid certificates, self-signed certificates, hostname mismatches, incomplete certificate chains, untrusted roots, outdated TLS 1.0 support, and missing HTTPS. Domain-age warnings catch a common phishing pattern: a site whose domain was registered less than 10 days ago is flagged red, and less than 30 days ago yellow. You also get an early heads-up when the certificate — or the domain registration itself — is within 14 days of expiring. Every issue carries a severity level, summarized as a coloured badge on the toolbar icon.
+
+TWO WAYS TO VIEW
+
+• Toolbar popup — click the icon for the full breakdown, with a re-scan button.
+• Optional floating panel — a small draggable card rendered on the page itself that follows you across normal browsing until you turn it off. It has a full mode and a compact mode (status, location flag, org and issuer at a glance), and it remembers where you placed it.
+
+ZERO SETUP, MINIMAL DATA
+
+No account, no API key, no configuration. Only the bare hostname of the active tab (never the full URL, never page content or history) is sent to the extension's own backend, which performs the check. No analytics, no tracking, no ads. Privacy policy: https://ssl-checker.anilrv.in/api/privacy
+
+Useful for developers, site owners, and security-conscious users who want to see at a glance who issued a site's certificate, when it expires, and where the site is actually hosted.
 
 ## Category
 

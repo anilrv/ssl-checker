@@ -32,11 +32,11 @@ func doCheck(t *testing.T, host string) CheckResult {
 
 func TestHandlerRealSites(t *testing.T) {
 	cases := []struct {
-		host        string
-		wantIssue   string
-		wantNoIssue string
+		host         string
+		wantIssue    string
+		wantNoIssues []string
 	}{
-		{host: "github.com", wantNoIssue: "expired"},
+		{host: "github.com", wantNoIssues: []string{"expired", "recently-registered", "young-domain"}},
 		{host: "expired.badssl.com", wantIssue: "expired"},
 		{host: "self-signed.badssl.com", wantIssue: "self-signed"},
 		{host: "wrong.host.badssl.com", wantIssue: "hostname-mismatch"},
@@ -49,8 +49,31 @@ func TestHandlerRealSites(t *testing.T) {
 		if c.wantIssue != "" && !contains(result.Issues, c.wantIssue) {
 			t.Errorf("%s: expected issue %q, got %v", c.host, c.wantIssue, result.Issues)
 		}
-		if c.wantNoIssue != "" && contains(result.Issues, c.wantNoIssue) {
-			t.Errorf("%s: unexpected issue %q present in %v", c.host, c.wantNoIssue, result.Issues)
+		for _, no := range c.wantNoIssues {
+			if contains(result.Issues, no) {
+				t.Errorf("%s: unexpected issue %q present in %v", c.host, no, result.Issues)
+			}
+		}
+		// IssueDetails must mirror Issues 1:1 — the extension renders from it.
+		if len(result.IssueDetails) != len(result.Issues) {
+			t.Errorf("%s: %d issueDetails for %d issues", c.host, len(result.IssueDetails), len(result.Issues))
+		} else {
+			for i, code := range result.Issues {
+				if result.IssueDetails[i].Code != code {
+					t.Errorf("%s: issueDetails[%d].code = %q, want %q", c.host, i, result.IssueDetails[i].Code, code)
+				}
+			}
+		}
+		if c.host == "expired.badssl.com" {
+			found := false
+			for _, d := range result.IssueDetails {
+				if d.Code == "expired" && d.Level == "critical" && d.Label != "" {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("expired.badssl.com: no critical 'expired' issueDetail in %+v", result.IssueDetails)
+			}
 		}
 	}
 }
@@ -124,9 +147,129 @@ func TestComputeIssuesNoSANs(t *testing.T) {
 		ChainVerified: true,
 		// DNSNames deliberately empty: browsers ignore CN, so a SAN-less cert covers nothing.
 	}
-	issues := computeIssues("example.com", probe, false)
+	issues := computeIssues(&CheckResult{Hostname: "example.com"}, probe, false)
 	if !contains(issues, "hostname-mismatch") {
 		t.Errorf("expected hostname-mismatch for a SAN-less cert, got %v", issues)
+	}
+}
+
+// healthyProbe is a cert that trips none of the rules: valid dates well clear of the
+// expiring-soon window, verified chain, SAN covering example.com.
+func healthyProbe(now time.Time) *certprobe.Result {
+	return &certprobe.Result{
+		NotBefore:     now.Add(-30 * 24 * time.Hour),
+		NotAfter:      now.Add(60 * 24 * time.Hour),
+		ChainComplete: true,
+		ChainVerified: true,
+		DNSNames:      []string{"example.com"},
+	}
+}
+
+func TestComputeIssuesDomainAge(t *testing.T) {
+	now := time.Now()
+	cases := []struct {
+		name       string
+		created    int64
+		wantRed    bool // recently-registered (critical)
+		wantYellow bool // young-domain (warning)
+	}{
+		{"5 days old", now.Add(-5 * 24 * time.Hour).Unix(), true, false},
+		{"just under 10 days", now.Add(-10*24*time.Hour + time.Hour).Unix(), true, false},
+		{"just over 10 days", now.Add(-10*24*time.Hour - time.Hour).Unix(), false, true},
+		{"29 days old", now.Add(-29 * 24 * time.Hour).Unix(), false, true},
+		{"just over 30 days", now.Add(-30*24*time.Hour - time.Hour).Unix(), false, false},
+		{"no whois data", 0, false, false},
+		{"future-dated creation", now.Add(time.Hour).Unix(), true, false},
+	}
+	for _, c := range cases {
+		result := &CheckResult{Hostname: "example.com", DomainCreated: c.created}
+		issues := computeIssues(result, healthyProbe(now), false)
+		if got := contains(issues, "recently-registered"); got != c.wantRed {
+			t.Errorf("%s: recently-registered=%v, want %v (issues %v)", c.name, got, c.wantRed, issues)
+		}
+		if got := contains(issues, "young-domain"); got != c.wantYellow {
+			t.Errorf("%s: young-domain=%v, want %v (issues %v)", c.name, got, c.wantYellow, issues)
+		}
+	}
+}
+
+func TestComputeIssuesCertExpiringSoon(t *testing.T) {
+	now := time.Now()
+	result := &CheckResult{Hostname: "example.com"}
+
+	probe := healthyProbe(now)
+	probe.NotAfter = now.Add(7 * 24 * time.Hour)
+	if issues := computeIssues(result, probe, false); !contains(issues, "cert-expiring-soon") {
+		t.Errorf("cert expiring in 7d: expected cert-expiring-soon, got %v", issues)
+	}
+
+	probe.NotAfter = now.Add(15 * 24 * time.Hour)
+	if issues := computeIssues(result, probe, false); contains(issues, "cert-expiring-soon") {
+		t.Errorf("cert expiring in 15d: unexpected cert-expiring-soon in %v", issues)
+	}
+
+	// Already expired: "expired" owns the finding, expiring-soon must stay quiet.
+	probe.NotAfter = now.Add(-time.Hour)
+	issues := computeIssues(result, probe, false)
+	if !contains(issues, "expired") || contains(issues, "cert-expiring-soon") {
+		t.Errorf("expired cert: want expired without cert-expiring-soon, got %v", issues)
+	}
+}
+
+func TestComputeIssuesDomainExpiringSoon(t *testing.T) {
+	now := time.Now()
+	cases := []struct {
+		name    string
+		expires int64
+		want    bool
+	}{
+		{"expires in 13 days", now.Add(13 * 24 * time.Hour).Unix(), true},
+		{"expires in 15 days", now.Add(15 * 24 * time.Hour).Unix(), false},
+		{"no whois data", 0, false},
+		{"already lapsed", now.Add(-time.Hour).Unix(), true},
+	}
+	for _, c := range cases {
+		result := &CheckResult{Hostname: "example.com", DomainExpires: c.expires}
+		issues := computeIssues(result, healthyProbe(now), false)
+		if got := contains(issues, "domain-expiring-soon"); got != c.want {
+			t.Errorf("%s: domain-expiring-soon=%v, want %v (issues %v)", c.name, got, c.want, issues)
+		}
+	}
+}
+
+func TestIssueCatalogAndSetIssues(t *testing.T) {
+	// Every code any backend path can emit; keep in step with computeIssues and the
+	// resolve-failed/probe-failed paths in performCheck.
+	emitted := []string{
+		"expired", "not-yet-valid", "self-signed", "incomplete-chain", "untrusted-chain",
+		"hostname-mismatch", "weak-protocol", "recently-registered", "young-domain",
+		"cert-expiring-soon", "domain-expiring-soon", "resolve-failed", "probe-failed",
+	}
+	validLevels := map[string]bool{"critical": true, "warning": true, "info": true}
+	for _, code := range emitted {
+		detail, ok := issueCatalog[code]
+		if !ok {
+			t.Errorf("emitted code %q missing from issueCatalog", code)
+			continue
+		}
+		if detail.Label == "" || !validLevels[detail.Level] {
+			t.Errorf("catalog entry for %q has bad label/level: %+v", code, detail)
+		}
+	}
+
+	var result CheckResult
+	setIssues(&result, []string{"recently-registered", "young-domain"})
+	if len(result.Issues) != 2 || len(result.IssueDetails) != 2 {
+		t.Fatalf("setIssues: got %d issues / %d details", len(result.Issues), len(result.IssueDetails))
+	}
+	for i, code := range result.Issues {
+		if result.IssueDetails[i].Code != code {
+			t.Errorf("issueDetails[%d].code = %q, want %q", i, result.IssueDetails[i].Code, code)
+		}
+	}
+	if result.IssueDetails[0].Level != "critical" || result.IssueDetails[1].Level != "warning" {
+		t.Errorf("domain-age tiers: got levels %q/%q, want critical/warning",
+			result.IssueDetails[0].Level, result.IssueDetails[1].Level)
 	}
 }
 
@@ -204,6 +347,41 @@ func TestResultTTLAndDataExpired(t *testing.T) {
 	}
 	if dataExpired(noDates) {
 		t.Error("zero dates reported as expired data")
+	}
+
+	// Threshold-crossing deadlines: a cached verdict must expire the moment a
+	// domain-age tier or an expiring-soon window would flip.
+	farCert := now.Add(90 * 24 * time.Hour).Unix()
+	farDomain := now.Add(365 * 24 * time.Hour).Unix()
+
+	redToYellow := CheckResult{NotAfter: farCert, DomainExpires: farDomain, DomainCreated: now.Add(-(10*24 - 6) * time.Hour).Unix()}
+	if got := resultTTL(redToYellow); got > 6*time.Hour || got < 6*time.Hour-time.Second {
+		t.Errorf("domain 6h from 10d boundary: got %v, want ~6h", got)
+	}
+	if dataExpired(redToYellow) {
+		t.Error("recently created domain reported as expired data")
+	}
+
+	yellowToClean := CheckResult{NotAfter: farCert, DomainExpires: farDomain, DomainCreated: now.Add(-(30*24 - 6) * time.Hour).Unix()}
+	if got := resultTTL(yellowToClean); got > 6*time.Hour || got < 6*time.Hour-time.Second {
+		t.Errorf("domain 6h from 30d boundary: got %v, want ~6h", got)
+	}
+
+	// Regression guard: thresholds already crossed are not deadlines — a mature
+	// domain must keep the full TTL, not get floored to minCacheTTL.
+	mature := CheckResult{NotAfter: farCert, DomainExpires: farDomain, DomainCreated: now.Add(-45 * 24 * time.Hour).Unix()}
+	if got := resultTTL(mature); got != resultsCacheTTL {
+		t.Errorf("mature domain: got %v, want full %v", got, resultsCacheTTL)
+	}
+
+	certNearWindow := CheckResult{NotAfter: now.Add((14*24 + 2) * time.Hour).Unix()}
+	if got := resultTTL(certNearWindow); got > 2*time.Hour || got < 2*time.Hour-time.Second {
+		t.Errorf("cert 2h from expiring-soon window: got %v, want ~2h", got)
+	}
+
+	domainNearWindow := CheckResult{NotAfter: farCert, DomainExpires: now.Add((14*24 + 3) * time.Hour).Unix()}
+	if got := resultTTL(domainNearWindow); got > 3*time.Hour || got < 3*time.Hour-time.Second {
+		t.Errorf("domain 3h from expiring-soon window: got %v, want ~3h", got)
 	}
 }
 

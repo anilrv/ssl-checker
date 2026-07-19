@@ -129,9 +129,58 @@ type CheckResult struct {
 	DNSProviders          []string `json:"dnsProviders,omitempty"`
 	OwnerOrg              string   `json:"ownerOrg,omitempty"`
 
-	Issues    []string `json:"issues"`
-	ScannedAt int64    `json:"scannedAt"`
-	Error     string   `json:"error,omitempty"`
+	Issues       []string      `json:"issues"`
+	IssueDetails []IssueDetail `json:"issueDetails,omitempty"`
+	ScannedAt    int64         `json:"scannedAt"`
+	Error        string        `json:"error,omitempty"`
+}
+
+// IssueDetail carries the display metadata for one issue code, so the extension
+// renders whatever the backend sends instead of keeping its own code→label/level
+// maps in sync — a new rule ships with a backend deploy alone. Issues (codes only)
+// stays alongside for extension versions that predate this field.
+type IssueDetail struct {
+	Code  string `json:"code"`
+	Label string `json:"label"`
+	Level string `json:"level"` // "critical" | "warning" | "info"
+}
+
+// issueCatalog is the single source of truth for every code the backend can emit.
+// The extension's own maps are fallback-only (for its client-side "no-https" code,
+// which never reaches this server, and for cached rows written before IssueDetails
+// existed) — new codes are added here, never there.
+var issueCatalog = map[string]IssueDetail{
+	"expired":              {Label: "Certificate has expired", Level: "critical"},
+	"not-yet-valid":        {Label: "Certificate is not yet valid", Level: "critical"},
+	"self-signed":          {Label: "Certificate appears to be self-signed", Level: "critical"},
+	"incomplete-chain":     {Label: "Server is missing its intermediate certificate", Level: "warning"},
+	"untrusted-chain":      {Label: "Chain doesn't lead to a trusted root CA", Level: "critical"},
+	"hostname-mismatch":    {Label: "Certificate does not cover this site's hostname", Level: "critical"},
+	"weak-protocol":        {Label: "Server still accepts an outdated TLS protocol (TLS 1.0)", Level: "warning"},
+	"recently-registered":  {Label: "Domain was registered less than 10 days ago", Level: "critical"},
+	"young-domain":         {Label: "Domain was registered less than 30 days ago", Level: "warning"},
+	"cert-expiring-soon":   {Label: "Certificate expires within 14 days", Level: "warning"},
+	"domain-expiring-soon": {Label: "Domain registration expires within 14 days", Level: "warning"},
+	"resolve-failed":       {Label: "Could not resolve this hostname", Level: "info"},
+	"probe-failed":         {Label: "Could not connect to check the certificate", Level: "info"},
+}
+
+// setIssues stores the codes plus their catalog metadata on the result, keeping the
+// two representations 1:1. Every site that assigns Issues must go through here.
+func setIssues(result *CheckResult, codes []string) {
+	result.Issues = codes
+	result.IssueDetails = nil
+	for _, code := range codes {
+		detail := issueCatalog[code]
+		detail.Code = code
+		if detail.Label == "" {
+			detail.Label = code
+		}
+		if detail.Level == "" {
+			detail.Level = "warning"
+		}
+		result.IssueDetails = append(result.IssueDetails, detail)
+	}
 }
 
 // ---- in-memory (per-instance) rate limiter ----
@@ -251,6 +300,15 @@ const resultsCacheTTL = 24 * time.Hour
 // minutes instead of hours.
 const minCacheTTL = 5 * time.Minute
 
+// ---- issue-rule thresholds ----
+// Each threshold below also feeds resultTTL: a cached result must expire at the
+// instant an issue would appear or disappear, or the cache would keep serving a
+// verdict that has stopped being true.
+const domainAgeCritical = 10 * 24 * time.Hour   // recently-registered: domain younger than this (red)
+const domainAgeWarning = 30 * 24 * time.Hour    // young-domain: domain younger than this (yellow)
+const certExpiryWarning = 14 * 24 * time.Hour   // cert-expiring-soon: NotAfter within this window
+const domainExpiryWarning = 14 * 24 * time.Hour // domain-expiring-soon: DomainExpires within this window
+
 // cappedTTL returns base reduced to the time remaining until the earliest non-zero
 // deadline, floored at minCacheTTL once that remaining time reaches zero. A copy of
 // this helper lives in the whois package (per-package caches are deliberately
@@ -281,10 +339,40 @@ func unixTime(sec int64) time.Time {
 	return time.Unix(sec, 0)
 }
 
+// futureDeadline returns t only if it is still ahead: a threshold crossing that has
+// already happened is not a deadline anymore. This matters because cappedTTL floors
+// past deadlines to minCacheTTL — right for NotAfter/DomainExpires (genuinely expired
+// data), but created+10d is in the past for every mature domain and NotAfter−14d for
+// every cert already inside its warning window; passing those unconditionally would
+// cap virtually every result at 5 minutes.
+func futureDeadline(t time.Time) time.Time {
+	if t.IsZero() || !t.After(time.Now()) {
+		return time.Time{}
+	}
+	return t
+}
+
 // resultTTL is the cache lifetime for one result: the default TTL, cut short if the
-// certificate or the domain registration expires before it would.
+// certificate or domain expires before it would — or if a time-based issue would
+// appear (a cert/domain entering its expiring-soon window) or change tier / disappear
+// (a young domain crossing the 10d red→yellow or 30d yellow→clean boundary) first.
 func resultTTL(result CheckResult) time.Duration {
-	return cappedTTL(resultsCacheTTL, unixTime(result.NotAfter), unixTime(result.DomainExpires))
+	deadlines := []time.Time{
+		unixTime(result.NotAfter),
+		unixTime(result.DomainExpires),
+	}
+	if created := unixTime(result.DomainCreated); !created.IsZero() {
+		deadlines = append(deadlines,
+			futureDeadline(created.Add(domainAgeCritical)),
+			futureDeadline(created.Add(domainAgeWarning)))
+	}
+	if notAfter := unixTime(result.NotAfter); !notAfter.IsZero() {
+		deadlines = append(deadlines, futureDeadline(notAfter.Add(-certExpiryWarning)))
+	}
+	if domExp := unixTime(result.DomainExpires); !domExp.IsZero() {
+		deadlines = append(deadlines, futureDeadline(domExp.Add(-domainExpiryWarning)))
+	}
+	return cappedTTL(resultsCacheTTL, deadlines...)
 }
 
 // dataExpired reports whether a cached result claims validity past the cert's or
@@ -460,7 +548,7 @@ func performCheck(ctx context.Context, hostname string) CheckResult {
 	ip, err := ssrfguard.ResolvePublicIP(ctx, hostname)
 	if err != nil {
 		result.Error = err.Error()
-		result.Issues = []string{"resolve-failed"}
+		setIssues(&result, []string{"resolve-failed"})
 		return result
 	}
 
@@ -474,7 +562,7 @@ func performCheck(ctx context.Context, hostname string) CheckResult {
 	probe, err := certprobe.Probe(ctx, ip, hostname)
 	if err != nil {
 		result.Error = err.Error()
-		result.Issues = []string{"probe-failed"}
+		setIssues(&result, []string{"probe-failed"})
 		return result
 	}
 
@@ -531,11 +619,13 @@ func performCheck(ctx context.Context, hostname string) CheckResult {
 	}
 
 	weakProtocol := certprobe.SupportsLegacyProtocol(ctx, ip, hostname, tls.VersionTLS10)
-	result.Issues = computeIssues(hostname, probe, weakProtocol)
+	setIssues(&result, computeIssues(&result, probe, weakProtocol))
 	return result
 }
 
-func computeIssues(hostname string, probe *certprobe.Result, weakProtocol bool) []string {
+// computeIssues runs after the WHOIS merge, so domain-registration fields on result
+// are populated (or zero when the best-effort lookup failed — those rules stay quiet).
+func computeIssues(result *CheckResult, probe *certprobe.Result, weakProtocol bool) []string {
 	var issues []string
 	now := time.Now()
 
@@ -570,7 +660,7 @@ func computeIssues(hostname string, probe *certprobe.Result, weakProtocol bool) 
 	// a mismatch, not a pass.
 	matched := false
 	for _, san := range probe.DNSNames {
-		if matchesHostname(hostname, san) {
+		if matchesHostname(result.Hostname, san) {
 			matched = true
 			break
 		}
@@ -581,6 +671,32 @@ func computeIssues(hostname string, probe *certprobe.Result, weakProtocol bool) 
 
 	if weakProtocol {
 		issues = append(issues, "weak-protocol")
+	}
+
+	// Domain age is a phishing/typosquat signal, tiered: red inside 10 days, yellow
+	// inside 30 — mutually exclusive by construction. A future-dated creation lands in
+	// the red tier (negative age), which is the right call for such an anomaly. The raw
+	// epoch field is compared, not the truncated DaysSinceRegistered int, so the issue
+	// boundary coincides exactly with the resultTTL deadline for the same threshold.
+	if result.DomainCreated > 0 {
+		age := now.Sub(time.Unix(result.DomainCreated, 0))
+		switch {
+		case age < domainAgeCritical:
+			issues = append(issues, "recently-registered")
+		case age < domainAgeWarning:
+			issues = append(issues, "young-domain")
+		}
+	}
+
+	// Suppressed once the cert is actually expired — "expired" already covers it.
+	if now.Before(probe.NotAfter) && probe.NotAfter.Sub(now) < certExpiryWarning {
+		issues = append(issues, "cert-expiring-soon")
+	}
+
+	// Deliberately also fires for an already-lapsed registration: there is no separate
+	// domain-expired issue to hand off to.
+	if result.DomainExpires > 0 && time.Unix(result.DomainExpires, 0).Sub(now) < domainExpiryWarning {
+		issues = append(issues, "domain-expiring-soon")
 	}
 
 	return issues

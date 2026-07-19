@@ -3,6 +3,11 @@
 // shows it when the user has floating view turned on (chrome.storage.local
 // 'floatViewEnabled') — otherwise it just sits idle listening for that setting to change.
 
+// Fallback only — the backend's issueDetails (issueCatalog in backend/main.go) is the
+// authority for labels and levels, so new rules ship without an extension update. This
+// map covers just the client-side 'no-https' code (no backend call happens for http://
+// tabs) and cached rows written before issueDetails existed. Do NOT add new backend
+// codes here; add them to the backend catalog instead.
 const ISSUE_LABELS = {
   'no-https': { label: 'No HTTPS — connection is not encrypted', level: 'critical' },
   expired: { label: 'Certificate has expired', level: 'critical' },
@@ -12,6 +17,10 @@ const ISSUE_LABELS = {
   'untrusted-chain': { label: "Chain doesn't lead to a trusted root CA", level: 'critical' },
   'hostname-mismatch': { label: "Certificate does not cover this site's hostname", level: 'critical' },
   'weak-protocol': { label: 'Server still accepts an outdated TLS protocol (TLS 1.0)', level: 'warning' },
+  'recently-registered': { label: 'Domain was registered less than 10 days ago', level: 'critical' },
+  'young-domain': { label: 'Domain was registered less than 30 days ago', level: 'warning' },
+  'cert-expiring-soon': { label: 'Certificate expires within 14 days', level: 'warning' },
+  'domain-expiring-soon': { label: 'Domain registration expires within 14 days', level: 'warning' },
   'resolve-failed': { label: 'Could not resolve this hostname', level: 'info' },
   'probe-failed': { label: 'Could not connect to check the certificate', level: 'info' },
 };
@@ -42,13 +51,18 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-function severityOf(issue) {
-  return (ISSUE_LABELS[issue] || {}).level || 'warning';
+// Label/level for one issue code: backend-supplied issueDetails wins, local map is
+// the fallback (see the ISSUE_LABELS comment).
+function issueInfo(result, code) {
+  const fromBackend = ((result && result.issueDetails) || []).find((d) => d.code === code);
+  if (fromBackend) return { label: fromBackend.label, level: fromBackend.level };
+  return ISSUE_LABELS[code] || { label: code, level: 'warning' };
 }
 
-function overallStatus(issues) {
-  if (!issues || issues.length === 0) return 'ok';
-  const levels = issues.map(severityOf);
+function overallStatus(result) {
+  const issues = (result && result.issues) || [];
+  if (issues.length === 0) return 'ok';
+  const levels = issues.map((i) => issueInfo(result, i).level);
   if (levels.includes('critical')) return 'critical';
   if (levels.includes('warning')) return 'warning';
   return 'info';
@@ -341,7 +355,7 @@ function renderPanel() {
 
 function renderCompact(host, shadow, pos) {
   const r = currentResult;
-  const status = r ? overallStatus(r.issues) : 'checking';
+  const status = r ? overallStatus(r) : 'checking';
   const bgRgb = STATUS_RGB[status] || STATUS_RGB.checking;
 
   shadow.innerHTML = `
@@ -431,7 +445,7 @@ function renderCompact(host, shadow, pos) {
 
 function renderFull(host, shadow, pos) {
   const r = currentResult;
-  const status = r ? overallStatus(r.issues) : '';
+  const status = r ? overallStatus(r) : '';
 
   shadow.innerHTML = `
     <style>
@@ -510,7 +524,7 @@ function renderFull(host, shadow, pos) {
       }
       <div id="issues">${(r.issues || [])
         .map((i) => {
-          const info = ISSUE_LABELS[i] || { label: i, level: 'warning' };
+          const info = issueInfo(r, i);
           return `<div class="issue ${info.level}">${escapeHtml(info.label)}</div>`;
         })
         .join('')}</div>

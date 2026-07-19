@@ -2,8 +2,11 @@ import { getFunctionUrl, fetchFunctionKey, ensureFunctionKey, buildCheckUrl } fr
 
 const DEFAULT_TITLE = 'SSL Issue Checker';
 
-// Severity per issue — must stay in sync with ISSUE_LABELS in popup.js/content.js so the
-// badge color always agrees with the severity the popup and floating panel display.
+// Fallback only — the badge reads severities from the backend's issueDetails on the
+// result (issueCatalog in backend/main.go is the authority), so new rules ship without
+// an extension update. This map covers just the client-side 'no-https' code (no backend
+// call happens for http:// tabs) and cached rows written before issueDetails existed.
+// Do NOT add new backend codes here; add them to the backend catalog instead.
 const ISSUE_LEVELS = {
   'no-https': 'critical',
   expired: 'critical',
@@ -13,6 +16,10 @@ const ISSUE_LEVELS = {
   'untrusted-chain': 'critical',
   'hostname-mismatch': 'critical',
   'weak-protocol': 'warning',
+  'recently-registered': 'critical',
+  'young-domain': 'warning',
+  'cert-expiring-soon': 'warning',
+  'domain-expiring-soon': 'warning',
   'resolve-failed': 'info',
   'probe-failed': 'info',
 };
@@ -89,7 +96,7 @@ async function handleTab(tabId, url) {
       return;
     }
     const result = await resp.json();
-    updateBadge(tabId, result.issues || []);
+    updateBadge(tabId, result.issues || [], result);
     updateTooltip(tabId, result);
     latestResults.set(tabId, { hostname, result });
     chrome.tabs.sendMessage(tabId, { type: 'sslResult', hostname, result }).catch(() => {
@@ -106,8 +113,16 @@ function clearIndicators(tabId) {
   chrome.action.setTitle({ tabId, title: DEFAULT_TITLE });
 }
 
-function updateBadge(tabId, issues) {
-  const levels = issues.map((i) => ISSUE_LEVELS[i] || 'warning');
+// Severity for one issue code: backend-supplied issueDetails wins, local map is the
+// fallback (see the ISSUE_LEVELS comment). result may be undefined for client-side
+// codes like 'no-https'.
+function levelOf(result, code) {
+  const fromBackend = ((result && result.issueDetails) || []).find((d) => d.code === code);
+  return (fromBackend && fromBackend.level) || ISSUE_LEVELS[code] || 'warning';
+}
+
+function updateBadge(tabId, issues, result) {
+  const levels = issues.map((i) => levelOf(result, i));
 
   if (issues.length === 0) {
     chrome.action.setBadgeText({ tabId, text: 'OK' });
