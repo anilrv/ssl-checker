@@ -32,10 +32,11 @@ type Info struct {
 // whoisjson.com's date fields use this layout, not RFC3339.
 const whoisTimeLayout = "2006-01-02 15:04:05"
 
-// ---- bounded in-memory cache, keyed by registrable domain: up to 500 entries, 24h TTL ----
+// ---- bounded in-memory cache, keyed by registrable domain: up to 500 entries, 30-day TTL ----
 // Domain registration data changes rarely, but this keeps daysLeft-style figures
 // reasonably fresh. Only successful lookups are cached — a transient outage self-heals
-// on the next request instead of being stuck empty for a day.
+// on the next request instead of being stuck empty for a day. Each entry's TTL is
+// capped at the domain's own expiration date so lapsed registration data isn't served.
 
 type cacheItem struct {
 	key       string
@@ -46,15 +47,13 @@ type cacheItem struct {
 type whoisCache struct {
 	mu       sync.Mutex
 	capacity int
-	ttl      time.Duration
 	ll       *list.List
 	items    map[string]*list.Element
 }
 
-func newWhoisCache(capacity int, ttl time.Duration) *whoisCache {
+func newWhoisCache(capacity int) *whoisCache {
 	return &whoisCache{
 		capacity: capacity,
-		ttl:      ttl,
 		ll:       list.New(),
 		items:    make(map[string]*list.Element),
 	}
@@ -78,19 +77,19 @@ func (c *whoisCache) Get(key string) (Info, bool) {
 	return item.info, true
 }
 
-func (c *whoisCache) Set(key string, info Info) {
+func (c *whoisCache) Set(key string, info Info, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if el, ok := c.items[key]; ok {
 		item := el.Value.(*cacheItem)
 		item.info = info
-		item.expiresAt = time.Now().Add(c.ttl)
+		item.expiresAt = time.Now().Add(ttl)
 		c.ll.MoveToFront(el)
 		return
 	}
 
-	item := &cacheItem{key: key, info: info, expiresAt: time.Now().Add(c.ttl)}
+	item := &cacheItem{key: key, info: info, expiresAt: time.Now().Add(ttl)}
 	el := c.ll.PushFront(item)
 	c.items[key] = el
 
@@ -109,7 +108,33 @@ func (c *whoisCache) Set(key string, info Info) {
 // wiped on every cold start anyway.
 const cacheTTL = 30 * 24 * time.Hour
 
-var cache = newWhoisCache(500, cacheTTL)
+// minCacheTTL is the floor applied when the domain registration has already lapsed:
+// the (accurate) lapsed data is still cached briefly to protect the tight monthly
+// request budget, while a renewal shows up within minutes.
+const minCacheTTL = 5 * time.Minute
+
+// cappedTTL returns base reduced to the time remaining until the earliest non-zero
+// deadline, floored at minCacheTTL once that remaining time reaches zero. A copy of
+// this helper lives in main.go (per-package caches are deliberately self-contained
+// in this repo).
+func cappedTTL(base time.Duration, deadlines ...time.Time) time.Duration {
+	ttl := base
+	now := time.Now()
+	for _, d := range deadlines {
+		if d.IsZero() {
+			continue
+		}
+		if remaining := d.Sub(now); remaining < ttl {
+			ttl = remaining
+		}
+	}
+	if ttl <= 0 {
+		ttl = minCacheTTL
+	}
+	return ttl
+}
+
+var cache = newWhoisCache(500)
 
 var httpClient = &http.Client{}
 
@@ -142,8 +167,12 @@ func Lookup(ctx context.Context, hostname string) *Info {
 	if info, ok := cache.Get(domain); ok {
 		return &info
 	}
-	if info, ok := durablecache.Get[Info](ctx, cacheTable, cachePartition, domain); ok {
-		cache.Set(domain, info)
+	// Durable rows written before per-entry TTL capping (or written just inside the
+	// minCacheTTL floor) can outlive the registration they describe; treat those as
+	// misses rather than serving lapsed data.
+	if info, ok := durablecache.Get[Info](ctx, cacheTable, cachePartition, domain); ok &&
+		(info.Expires.IsZero() || time.Now().Before(info.Expires)) {
+		cache.Set(domain, info, cappedTTL(cacheTTL, info.Expires))
 		return &info
 	}
 
@@ -190,7 +219,8 @@ func Lookup(ctx context.Context, hostname string) *Info {
 		info.OwnerOrg = body.Contacts.Owner[0].Organization
 	}
 
-	cache.Set(domain, info)
-	go durablecache.Set(context.Background(), cacheTable, cachePartition, domain, info, cacheTTL)
+	ttl := cappedTTL(cacheTTL, info.Expires)
+	cache.Set(domain, info, ttl)
+	go durablecache.Set(context.Background(), cacheTable, cachePartition, domain, info, ttl)
 	return &info
 }

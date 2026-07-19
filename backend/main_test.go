@@ -138,3 +138,91 @@ func contains(list []string, s string) bool {
 	}
 	return false
 }
+
+func TestCappedTTL(t *testing.T) {
+	now := time.Now()
+	cases := []struct {
+		name      string
+		deadlines []time.Time
+		want      time.Duration
+	}{
+		{name: "no deadlines", deadlines: nil, want: resultsCacheTTL},
+		{name: "zero deadlines ignored", deadlines: []time.Time{{}, {}}, want: resultsCacheTTL},
+		{name: "deadline beyond base", deadlines: []time.Time{now.Add(48 * time.Hour)}, want: resultsCacheTTL},
+		{name: "deadline inside base", deadlines: []time.Time{now.Add(2 * time.Hour)}, want: 2 * time.Hour},
+		{name: "earliest of several wins", deadlines: []time.Time{now.Add(6 * time.Hour), now.Add(2 * time.Hour)}, want: 2 * time.Hour},
+		{name: "deadline within floor window stays exact", deadlines: []time.Time{now.Add(2 * time.Minute)}, want: 2 * time.Minute},
+		{name: "past deadline floors", deadlines: []time.Time{now.Add(-time.Hour)}, want: minCacheTTL},
+	}
+	for _, c := range cases {
+		got := cappedTTL(resultsCacheTTL, c.deadlines...)
+		// cappedTTL calls time.Now() itself, so allow a small skew.
+		if diff := got - c.want; diff < -time.Second || diff > time.Second {
+			t.Errorf("%s: got %v, want ~%v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestResultTTLAndDataExpired(t *testing.T) {
+	now := time.Now()
+
+	healthy := CheckResult{NotAfter: now.Add(90 * 24 * time.Hour).Unix(), DomainExpires: now.Add(365 * 24 * time.Hour).Unix()}
+	if got := resultTTL(healthy); got != resultsCacheTTL {
+		t.Errorf("healthy cert: got %v, want full %v", got, resultsCacheTTL)
+	}
+	if dataExpired(healthy) {
+		t.Error("healthy cert reported as expired data")
+	}
+
+	expiringSoon := CheckResult{NotAfter: now.Add(3 * time.Hour).Unix()}
+	if got := resultTTL(expiringSoon); got > 3*time.Hour || got < 3*time.Hour-time.Second {
+		t.Errorf("cert expiring in 3h: got %v, want ~3h", got)
+	}
+
+	domainExpiringSoon := CheckResult{NotAfter: now.Add(90 * 24 * time.Hour).Unix(), DomainExpires: now.Add(time.Hour).Unix()}
+	if got := resultTTL(domainExpiringSoon); got > time.Hour || got < time.Hour-time.Second {
+		t.Errorf("domain expiring in 1h: got %v, want ~1h", got)
+	}
+
+	expired := CheckResult{NotAfter: now.Add(-time.Hour).Unix()}
+	if got := resultTTL(expired); got != minCacheTTL {
+		t.Errorf("expired cert: got %v, want floor %v", got, minCacheTTL)
+	}
+	if !dataExpired(expired) {
+		t.Error("expired cert not reported as expired data")
+	}
+
+	lapsedDomain := CheckResult{NotAfter: now.Add(90 * 24 * time.Hour).Unix(), DomainExpires: now.Add(-time.Hour).Unix()}
+	if !dataExpired(lapsedDomain) {
+		t.Error("lapsed domain not reported as expired data")
+	}
+
+	// omitempty zeros (e.g. probe without whois data) must not cap or expire anything
+	noDates := CheckResult{}
+	if got := resultTTL(noDates); got != resultsCacheTTL {
+		t.Errorf("no dates: got %v, want full %v", got, resultsCacheTTL)
+	}
+	if dataExpired(noDates) {
+		t.Error("zero dates reported as expired data")
+	}
+}
+
+func TestResultCacheHonorsPerEntryTTL(t *testing.T) {
+	c := newResultCache(10)
+
+	c.Set("live.example", CheckResult{Org: "live"}, time.Hour)
+	if _, ok := c.Get("live.example"); !ok {
+		t.Error("entry with 1h TTL should be a hit")
+	}
+
+	c.Set("dead.example", CheckResult{Org: "dead"}, -time.Second)
+	if _, ok := c.Get("dead.example"); ok {
+		t.Error("entry with already-elapsed TTL should be a miss")
+	}
+
+	// Updating an existing entry must apply the new TTL, not the original one.
+	c.Set("live.example", CheckResult{Org: "live"}, -time.Second)
+	if _, ok := c.Get("live.example"); ok {
+		t.Error("updated entry with elapsed TTL should be a miss")
+	}
+}

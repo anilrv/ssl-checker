@@ -77,9 +77,17 @@ already does that.
   query parameter; the function-key auth for `checkssl` is Azure's own platform mechanism.
 - **Bounded LRU caches**, one per lookup, keyed at the right granularity: `main.go`'s
   `resultsCache` (hostname, 500 entries, 24h), `geoip`'s (IP, 500, 7 days — IP-to-ASN/geo
-  data changes slowly), `whois`'s (registrable domain, 500, 24h). Only successful lookups
-  are cached, so a transient failure self-heals on the next request instead of being
-  cached as a permanent miss.
+  data changes slowly), `whois`'s (registrable domain, 500, 30 days — persistence via the
+  durable Table Storage tier is what makes a long TTL pay off against whoisjson.com's
+  1000-request/month budget). Only successful lookups are cached, so a transient failure
+  self-heals on the next request instead of being cached as a permanent miss.
+- **Per-entry TTLs are capped at the data's own expiry** (`cappedTTL` in `main.go` and
+  `whois.go`): a result whose cert `NotAfter` or domain expiration falls inside the
+  default TTL window expires from the cache at that moment instead, so a cached "valid"
+  is never served past the point it stops being true. Already-expired data gets a 5-minute
+  floor (`minCacheTTL`) — cached briefly, so a renewal shows up within minutes. Durable
+  reads additionally guard against pre-cap legacy rows by treating expired-data hits as
+  misses.
 - **HTTP/2 requires a different code path for reading response headers.** A connection
   that negotiated ALPN `h2` only understands HTTP/2 framing from that point on — writing a
   raw HTTP/1.1 request line over it doesn't error, it just silently never produces a

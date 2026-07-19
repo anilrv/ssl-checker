@@ -174,6 +174,8 @@ func (rl *rateLimiter) Allow(key string, limit int, window time.Duration) bool {
 var limiter = newRateLimiter()
 
 // ---- bounded in-memory LRU result cache: up to 500 entries, 24h TTL ----
+// Each entry's TTL is capped at the data's own expiry (cert NotAfter, domain
+// expiration) so a result is never served past the moment it stops being true.
 
 type cacheItem struct {
 	key       string
@@ -184,15 +186,13 @@ type cacheItem struct {
 type resultCache struct {
 	mu       sync.Mutex
 	capacity int
-	ttl      time.Duration
 	ll       *list.List
 	items    map[string]*list.Element
 }
 
-func newResultCache(capacity int, ttl time.Duration) *resultCache {
+func newResultCache(capacity int) *resultCache {
 	return &resultCache{
 		capacity: capacity,
-		ttl:      ttl,
 		ll:       list.New(),
 		items:    make(map[string]*list.Element),
 	}
@@ -216,19 +216,19 @@ func (c *resultCache) Get(key string) (CheckResult, bool) {
 	return item.result, true
 }
 
-func (c *resultCache) Set(key string, result CheckResult) {
+func (c *resultCache) Set(key string, result CheckResult, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if el, ok := c.items[key]; ok {
 		item := el.Value.(*cacheItem)
 		item.result = result
-		item.expiresAt = time.Now().Add(c.ttl)
+		item.expiresAt = time.Now().Add(ttl)
 		c.ll.MoveToFront(el)
 		return
 	}
 
-	item := &cacheItem{key: key, result: result, expiresAt: time.Now().Add(c.ttl)}
+	item := &cacheItem{key: key, result: result, expiresAt: time.Now().Add(ttl)}
 	el := c.ll.PushFront(item)
 	c.items[key] = el
 
@@ -241,9 +241,59 @@ func (c *resultCache) Set(key string, result CheckResult) {
 	}
 }
 
-var resultsCache = newResultCache(500, 24*time.Hour)
+var resultsCache = newResultCache(500)
 
 const resultsCacheTTL = 24 * time.Hour
+
+// minCacheTTL is the floor applied when the underlying data has already expired:
+// the (accurate) "expired" result is still cached briefly so a popular dead site
+// doesn't trigger a full probe on every request, while a renewal shows up within
+// minutes instead of hours.
+const minCacheTTL = 5 * time.Minute
+
+// cappedTTL returns base reduced to the time remaining until the earliest non-zero
+// deadline, floored at minCacheTTL once that remaining time reaches zero. A copy of
+// this helper lives in the whois package (per-package caches are deliberately
+// self-contained in this repo).
+func cappedTTL(base time.Duration, deadlines ...time.Time) time.Duration {
+	ttl := base
+	now := time.Now()
+	for _, d := range deadlines {
+		if d.IsZero() {
+			continue
+		}
+		if remaining := d.Sub(now); remaining < ttl {
+			ttl = remaining
+		}
+	}
+	if ttl <= 0 {
+		ttl = minCacheTTL
+	}
+	return ttl
+}
+
+// unixTime maps a Unix-seconds field to time.Time, with 0 (field absent) becoming
+// the zero time so cappedTTL ignores it.
+func unixTime(sec int64) time.Time {
+	if sec == 0 {
+		return time.Time{}
+	}
+	return time.Unix(sec, 0)
+}
+
+// resultTTL is the cache lifetime for one result: the default TTL, cut short if the
+// certificate or the domain registration expires before it would.
+func resultTTL(result CheckResult) time.Duration {
+	return cappedTTL(resultsCacheTTL, unixTime(result.NotAfter), unixTime(result.DomainExpires))
+}
+
+// dataExpired reports whether a cached result claims validity past the cert's or
+// domain's own expiry — i.e. the world has moved on since it was probed.
+func dataExpired(result CheckResult) bool {
+	now := time.Now().Unix()
+	return (result.NotAfter > 0 && now > result.NotAfter) ||
+		(result.DomainExpires > 0 && now > result.DomainExpires)
+}
 
 // ---- durable L2 layer (Azure Table Storage) behind the in-memory cache above ----
 // Flex Consumption scales to zero when idle and scales out under load, wiping/fragmenting
@@ -287,8 +337,11 @@ func checkSSLHandler(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, cached)
 			return
 		}
-		if cached, ok := durablecache.Get[CheckResult](ctx, resultsCacheTable, resultsCachePartition, hostname); ok {
-			resultsCache.Set(hostname, cached)
+		// Durable rows written before per-entry TTL capping (or written just inside the
+		// minCacheTTL floor) can outlive the cert or domain registration they describe;
+		// treat those as misses rather than serving a result that is no longer true.
+		if cached, ok := durablecache.Get[CheckResult](ctx, resultsCacheTable, resultsCachePartition, hostname); ok && !dataExpired(cached) {
+			resultsCache.Set(hostname, cached, resultTTL(cached))
 			writeJSON(w, http.StatusOK, cached)
 			return
 		}
@@ -299,8 +352,9 @@ func checkSSLHandler(w http.ResponseWriter, r *http.Request) {
 	// blip) for the full TTL across every instance would be a much bigger footgun than the
 	// old in-memory-only behavior this replaces.
 	if result.Error == "" {
-		resultsCache.Set(hostname, result)
-		go durablecache.Set(context.Background(), resultsCacheTable, resultsCachePartition, hostname, result, resultsCacheTTL)
+		ttl := resultTTL(result)
+		resultsCache.Set(hostname, result, ttl)
+		go durablecache.Set(context.Background(), resultsCacheTable, resultsCachePartition, hostname, result, ttl)
 	}
 	writeJSON(w, http.StatusOK, result)
 }
