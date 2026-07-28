@@ -55,6 +55,56 @@ func TestResolveErrorsWhenAllResolversDown(t *testing.T) {
 	}
 }
 
+func TestNeverPubliclyResolvable(t *testing.T) {
+	cases := []struct {
+		host string
+		want bool
+	}{
+		{"printer.local", true},
+		{"PRINTER.LOCAL", true}, // case-insensitive
+		{"a.b.c.local", true},
+		{"server.internal", true},
+		{"router.home.arpa", true},
+		{"foo.example", true},
+		{"foo.test", true},
+		{"foo.invalid", true},
+		{"foo.onion", true},
+		{"localhost", true}, // single-label, but exercised here in case a future caller skips ValidHostname
+		{"192.168.0.85", true},
+		{"8.8.8.8", true},
+		{"::1", true},
+		{"2001:db8::1", true},
+		{"example.com", false},  // real, deliberately-live IANA demo domain — must stay checkable
+		{"sub.example.org", false},
+		{"github.com", false},
+		{"www.google.com", false},
+	}
+	for _, c := range cases {
+		if got := NeverPubliclyResolvable(c.host); got != c.want {
+			t.Errorf("NeverPubliclyResolvable(%q) = %v, want %v", c.host, got, c.want)
+		}
+	}
+}
+
+func TestResolvePublicIPSkipsReservedAndIPLiteralHosts(t *testing.T) {
+	hit := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hit = true
+		fmt.Fprint(w, `{"Answer":[]}`)
+	}))
+	defer server.Close()
+	swapEndpoints(t, []string{server.URL, server.URL})
+
+	for _, host := range []string{"printer.local", "server.internal", "192.168.0.85", "::1"} {
+		if _, err := ResolvePublicIP(context.Background(), host); err == nil {
+			t.Errorf("ResolvePublicIP(%q): expected an error", host)
+		}
+	}
+	if hit {
+		t.Error("DoH endpoint was queried for a reserved/IP-literal hostname")
+	}
+}
+
 func TestResolveDoesNotFallBackOnEmptyAnswer(t *testing.T) {
 	// NXDOMAIN / no records is a real answer, not an outage — the second resolver must
 	// not even be consulted.

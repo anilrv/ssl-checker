@@ -172,6 +172,7 @@ var issueCatalog = map[string]IssueDetail{
 	"domain-expiring-soon": {Label: "Domain registration expires within 14 days", Level: "warning"},
 	"resolve-failed":       {Label: "Could not resolve this hostname", Level: "info"},
 	"probe-failed":         {Label: "Could not connect to check the certificate", Level: "info"},
+	"private-use-host":     {Label: "Private-use address or reserved hostname — no public certificate data available", Level: "info"},
 }
 
 // setIssues stores the codes plus their catalog metadata on the result, keeping the
@@ -448,8 +449,11 @@ func checkSSLHandler(w http.ResponseWriter, r *http.Request) {
 	result := performCheck(ctx, hostname)
 	// Only cache successful results — durably persisting a transient failure (e.g. a DNS
 	// blip) for the full TTL across every instance would be a much bigger footgun than the
-	// old in-memory-only behavior this replaces.
-	if result.Error == "" {
+	// old in-memory-only behavior this replaces. The one deliberate exception is
+	// "private-use-host": that verdict is a permanent fact about the hostname string
+	// itself (an IP literal or a reserved TLD never becomes public), not a transient
+	// failure, so it's safe — and worth it, to avoid a durable-cache read on every repeat.
+	if result.Error == "" || (len(result.Issues) == 1 && result.Issues[0] == "private-use-host") {
 		ttl := resultTTL(result)
 		resultsCache.Set(hostname, result, ttl)
 		go durablecache.Set(context.Background(), resultsCacheTable, resultsCachePartition, hostname, result, ttl)
@@ -548,12 +552,14 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 func performCheck(ctx context.Context, hostname string) CheckResult {
 	result := CheckResult{Hostname: hostname, ScannedAt: time.Now().Unix()}
 
-	// whois.Lookup only needs the hostname (not the resolved IP), so it can start even
-	// before DNS resolution — overlapping with everything else that follows, rather than
-	// just with certprobe.Probe. The channel is buffered so the goroutine can't leak even
-	// if this function returns early before anyone reads from it.
-	whoisCh := make(chan *whois.Info, 1)
-	go func() { whoisCh <- whois.Lookup(ctx, hostname) }()
+	// IP literals and reserved/private-use TLDs (.local, .internal, etc.) can never have
+	// a public DNS record or WHOIS registration — reject instantly, before spending a
+	// DNS-over-HTTPS or whoisjson.com round trip on something guaranteed to fail.
+	if ssrfguard.NeverPubliclyResolvable(hostname) {
+		result.Error = hostname + " is a private-use address or reserved hostname and can't have a publicly verifiable certificate"
+		setIssues(&result, []string{"private-use-host"})
+		return result
+	}
 
 	ip, err := ssrfguard.ResolvePublicIP(ctx, hostname)
 	if err != nil {
@@ -561,6 +567,14 @@ func performCheck(ctx context.Context, hostname string) CheckResult {
 		setIssues(&result, []string{"resolve-failed"})
 		return result
 	}
+
+	// whois.Lookup, like geoip.Lookup below, only starts once DNS resolution has
+	// confirmed a public IP — never blind/concurrent with it — so a hostname that fails
+	// to resolve, or resolves only to a private IP (e.g. corporate split-horizon DNS),
+	// never triggers a whoisjson.com call either. The channel is buffered so the
+	// goroutine can't leak even if this function returns early before anyone reads it.
+	whoisCh := make(chan *whois.Info, 1)
+	go func() { whoisCh <- whois.Lookup(ctx, hostname) }()
 
 	// geoip.Lookup runs concurrently with certprobe.Probe (not after it) so its latency
 	// overlaps with the TLS work instead of adding to it — both only need the IP above.

@@ -16,6 +16,7 @@ import (
 	"golang.org/x/net/publicsuffix"
 
 	"sslcheckerfunc/durablecache"
+	"sslcheckerfunc/ssrfguard"
 )
 
 const cacheTable = "sslcheckercache"
@@ -159,6 +160,10 @@ type registrarResponse struct {
 // reason (no WHOISJSON_TOKEN configured, request failure, timeout, bad response).
 // Bounded to 2 seconds regardless of how much of ctx's deadline remains.
 func Lookup(ctx context.Context, hostname string) *Info {
+	if ssrfguard.NeverPubliclyResolvable(hostname) {
+		return nil
+	}
+
 	domain, err := publicsuffix.EffectiveTLDPlusOne(hostname)
 	if err != nil {
 		domain = hostname // best-effort fallback (e.g. bare TLDs, unusual hosts)

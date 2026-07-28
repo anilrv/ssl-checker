@@ -1,9 +1,32 @@
 package whois
 
 import (
+	"context"
+	"net/http"
 	"testing"
 	"time"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestLookupSkipsReservedAndIPLiteralHosts(t *testing.T) {
+	t.Setenv("WHOISJSON_TOKEN", "dummy-token")
+
+	oldTransport := httpClient.Transport
+	httpClient.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		t.Fatalf("unexpected outbound request to %s", r.URL)
+		return nil, nil
+	})
+	t.Cleanup(func() { httpClient.Transport = oldTransport })
+
+	for _, host := range []string{"printer.local", "server.internal", "a.b.c.local", "192.168.0.85", "8.8.8.8", "::1"} {
+		if info := Lookup(context.Background(), host); info != nil {
+			t.Errorf("Lookup(%q) = %+v, want nil", host, info)
+		}
+	}
+}
 
 func TestCappedTTL(t *testing.T) {
 	now := time.Now()

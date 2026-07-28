@@ -35,7 +35,11 @@ the connection because of them). Package layout:
   whoisjson.com (uses `golang.org/x/net/publicsuffix` to reduce a subdomain to its
   registrable domain, since WHOIS operates at the domain level).
 - `ssrfguard/` — resolves a hostname to a public IP only; rejects private/loopback/link-local
-  targets before the probe ever dials out.
+  targets before the probe ever dials out. `NeverPubliclyResolvable` rejects IP literals
+  and reserved/private-use TLDs (`.local`, `.internal`, `.home.arpa`, etc. — verified
+  against the IANA Special-Use Domain Names registry) before any DNS query is even made;
+  `whois.Lookup` calls this same check before its own network request, so `whois` depends
+  on `ssrfguard` for that classification, not the other way around.
 - `cmd/localtest/` — a standalone harness (`go run ./cmd/localtest`) that exercises the
   probe/geoip/whois packages directly against real hosts, without needing a deployed
   function or a function key.
@@ -80,7 +84,11 @@ already does that.
   data changes slowly), `whois`'s (registrable domain, 500, 30 days — persistence via the
   durable Table Storage tier is what makes a long TTL pay off against whoisjson.com's
   1000-request/month budget). Only successful lookups are cached, so a transient failure
-  self-heals on the next request instead of being cached as a permanent miss.
+  self-heals on the next request instead of being cached as a permanent miss. `main.go`'s
+  `resultsCache` has one deliberate exception: a `private-use-host` result (IP literal or
+  reserved TLD, from `ssrfguard.NeverPubliclyResolvable`) is cached too, because that verdict
+  is a permanent fact about the hostname string, not a transient failure — unlike every
+  other `result.Error` case, which stays uncached.
 - **Per-entry TTLs are capped at the data's own expiry** (`cappedTTL` in `main.go` and
   `whois.go`): a result whose cert `NotAfter` or domain expiration falls inside the
   default TTL window expires from the cache at that moment instead, so a cached "valid"

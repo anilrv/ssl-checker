@@ -95,6 +95,58 @@ func TestHandlerSSRFBlocked(t *testing.T) {
 	}
 }
 
+func TestHandlerPrivateUseHost(t *testing.T) {
+	cases := []string{"printer.local", "server.internal", "a.b.c.local", "192.168.0.85", "8.8.8.8", "router.home.arpa"}
+	for _, host := range cases {
+		result := doCheck(t, host)
+		if result.Error == "" {
+			t.Errorf("%s: expected an error, got clean result", host)
+		}
+		if len(result.Issues) != 1 || result.Issues[0] != "private-use-host" {
+			t.Errorf("%s: issues = %v, want [private-use-host]", host, result.Issues)
+		}
+		// This classification is a permanent fact about the hostname string, so — unlike
+		// a genuine resolve-failed/probe-failed result — it must still get cached.
+		if cached, ok := resultsCache.Get(host); !ok {
+			t.Errorf("%s: expected result to be cached", host)
+		} else if len(cached.Issues) != 1 || cached.Issues[0] != "private-use-host" {
+			t.Errorf("%s: cached result issues = %v, want [private-use-host]", host, cached.Issues)
+		}
+	}
+}
+
+// TestHandlerPrivateUseHostServedFromCache exercises the actual read path
+// (checkSSLHandler's resultsCache.Get, main.go:433-437), not just the write — a plain
+// repeat request (no force=1) for a private-use host must be served from cache instead
+// of recomputing, which is the whole point of caching this classification. It injects a
+// sentinel value into the cache after the real classification runs once, so a hit
+// returns something recomputation could never produce, unambiguously proving the read
+// path (not just equal-by-coincidence timing) is what served the second request.
+func TestHandlerPrivateUseHostServedFromCache(t *testing.T) {
+	const host = "cache-read-check.local"
+
+	first := doCheck(t, host) // doCheck always sends force=1, populating the cache
+	if first.Error == "" || first.Issues[0] != "private-use-host" {
+		t.Fatalf("setup: expected private-use-host result, got %+v", first)
+	}
+
+	sentinel := first
+	sentinel.Org = "sentinel-value-only-a-cache-hit-can-return"
+	resultsCache.Set(host, sentinel, time.Hour)
+
+	req := httptest.NewRequest("GET", "/api/checkssl?host="+host, nil)
+	rec := httptest.NewRecorder()
+	checkSSLHandler(rec, req)
+
+	var second CheckResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &second); err != nil {
+		t.Fatalf("bad JSON: %v\nbody: %s", err, rec.Body.String())
+	}
+	if second.Org != sentinel.Org {
+		t.Errorf("expected the sentinel cached result to be served verbatim, got %+v (recomputed instead of read from cache)", second)
+	}
+}
+
 func TestRateLimit(t *testing.T) {
 	rl := newRateLimiter()
 	allowed := 0
@@ -297,6 +349,7 @@ func TestIssueCatalogAndSetIssues(t *testing.T) {
 		"hostname-mismatch", "weak-protocol", "revoked", "weak-signature", "weak-key",
 		"recently-registered", "young-domain",
 		"cert-expiring-soon", "domain-expiring-soon", "resolve-failed", "probe-failed",
+		"private-use-host",
 	}
 	validLevels := map[string]bool{"critical": true, "warning": true, "info": true}
 	for _, code := range emitted {

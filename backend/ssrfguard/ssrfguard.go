@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -92,6 +93,47 @@ func ValidHostname(s string) bool {
 	return hostnameRe.MatchString(s)
 }
 
+// reservedTLDs are hostnames whose last label can never be a real public TLD — most are
+// IANA Special-Use Domain Names (verified against
+// https://www.iana.org/assignments/special-use-domain-names/special-use-domain-names.txt),
+// so a lookup against them is guaranteed to waste a round trip rather than ever succeed.
+var reservedTLDs = map[string]bool{
+	"local":     true, // RFC 6762 (mDNS) — IANA registry
+	"localhost": true, // RFC 6761 — IANA registry
+	"invalid":   true, // RFC 6761 — IANA registry
+	"test":      true, // RFC 6761 — IANA registry
+	"example":   true, // RFC 6761 — IANA registry
+	"onion":     true, // RFC 7686 (Tor) — IANA registry
+	"alt":       true, // RFC 6761bis — IANA registry
+	// "internal" is NOT in the IANA registry — it's a widely-adopted private-network
+	// convention (e.g. Google Cloud's own internal DNS zone) rather than an IETF
+	// reservation, but common enough in practice to be worth blocking anyway.
+	"internal": true,
+}
+
+// NeverPubliclyResolvable reports whether hostname is an IP-address literal (any range,
+// public or private — whoisjson.com's domain-only API can't do anything useful with one
+// either way) or ends in a reserved/private-use label. Both cases can never have a real
+// public DNS record or WHOIS registration, so DNS and WHOIS lookups for them are wasted
+// calls by construction, not failures worth retrying.
+//
+// Deliberately NOT included: the IANA registry also reserves the exact names
+// example.com/example.net/example.org (RFC 2606) — but unlike the bare "example" TLD,
+// ICANN keeps those specific domains genuinely live, publicly resolvable, and WHOIS-
+// registered precisely so they can be used to try out tools like this one; treating them
+// as unreachable would be simply wrong, not just cautious.
+func NeverPubliclyResolvable(hostname string) bool {
+	if net.ParseIP(hostname) != nil {
+		return true
+	}
+	labels := strings.Split(strings.ToLower(hostname), ".")
+	n := len(labels)
+	if n >= 2 && labels[n-2] == "home" && labels[n-1] == "arpa" {
+		return true // RFC 8375 home.arpa
+	}
+	return reservedTLDs[labels[n-1]]
+}
+
 type dohAnswer struct {
 	Type int    `json:"type"`
 	Data string `json:"data"`
@@ -170,6 +212,10 @@ func dohQueryOne(ctx context.Context, endpoint, hostname, qtype string) ([]strin
 // PUBLIC IP address, preferring IPv4. Returns an error if resolution fails, or if the
 // hostname resolves only to private/reserved/loopback addresses.
 func ResolvePublicIP(ctx context.Context, hostname string) (net.IP, error) {
+	if NeverPubliclyResolvable(hostname) {
+		return nil, fmt.Errorf("%s is a private-use or IP-literal hostname, not publicly resolvable", hostname)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
