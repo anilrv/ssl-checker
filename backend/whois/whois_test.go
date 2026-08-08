@@ -1,12 +1,18 @@
 package whois
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/azure/azure-functions-golang-worker/sdk"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -88,6 +94,43 @@ func TestLookupSurvivesArrayShapedContacts(t *testing.T) {
 	}
 	if info.OwnerOrg != "" {
 		t.Errorf("OwnerOrg = %q, want empty (contacts carried no owner data)", info.OwnerOrg)
+	}
+}
+
+// TestLookupLogsOnRequestFailure verifies a genuine lookup failure (e.g. the 2s budget
+// expiring) actually reaches slog, not just that the code path compiles. Lookup rebinds
+// ctx to a timeout-scoped child before logging, so this also guards against that
+// rebinding accidentally losing the invocation attributes slog's sdk handler attaches.
+func TestLookupLogsOnRequestFailure(t *testing.T) {
+	t.Setenv("WHOISJSON_TOKEN", "dummy-token")
+
+	oldTransport := httpClient.Transport
+	httpClient.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return nil, errors.New("simulated network failure")
+	})
+	t.Cleanup(func() { httpClient.Transport = oldTransport })
+
+	var buf bytes.Buffer
+	oldDefault := slog.Default()
+	slog.SetDefault(slog.New(sdk.NewLogHandler(slog.NewJSONHandler(&buf, nil))))
+	t.Cleanup(func() { slog.SetDefault(oldDefault) })
+
+	if info := Lookup(context.Background(), "logging-check-whois-test.com"); info != nil {
+		t.Fatalf("Lookup = %+v, want nil on request failure", info)
+	}
+
+	var record struct {
+		Level string `json:"level"`
+		Msg   string `json:"msg"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &record); err != nil {
+		t.Fatalf("expected one JSON log record, got %q (err: %v)", buf.String(), err)
+	}
+	if record.Level != slog.LevelError.String() {
+		t.Errorf("level = %q, want %q", record.Level, slog.LevelError.String())
+	}
+	if record.Msg != "whois: request failed" {
+		t.Errorf("msg = %q, want %q", record.Msg, "whois: request failed")
 	}
 }
 

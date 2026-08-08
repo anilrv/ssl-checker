@@ -76,6 +76,13 @@ already does that.
   Each owns a short, fixed timeout (2s) independent of the parent context's remaining
   deadline, and returns `nil` on any failure — a slow or dead upstream degrades the
   response, it never fails it. Follow this pattern for any new lookup in the same vein.
+  Genuine failures (network error, non-200, undecodable body) are still logged at Error
+  level via `slog` — silent to the caller, not silent to us; they reach Application
+  Insights (importing the SDK's `sdk` package auto-installs the routing `slog` handler,
+  so a plain `slog.ErrorContext` call is all a new lookup needs). Expected non-failures —
+  no token configured, revocation's "couldn't determine" outcomes, `main.go`'s
+  `resolve-failed`/`probe-failed` (already visible to the caller via `result.Error`) — are
+  deliberately not logged, to keep the signal to genuine failures.
 - **Three different lookups, three different auth schemes** — don't reach for the wrong
   one by habit: WHOIS uses `Authorization: TOKEN=<token>`; geolocation uses a `?apiKey=`
   query parameter; the function-key auth for `checkssl` is Azure's own platform mechanism.

@@ -1,13 +1,18 @@
 // Package whois does a best-effort domain registration lookup via whoisjson.com. Every
 // failure mode (missing token, timeout, rate limit, bad response) is swallowed here —
 // callers only ever see a nil *Info, never an error, since this is purely supplementary
-// context and must never affect the main certificate check.
+// context and must never affect the main certificate check. Genuine failures (network
+// error, non-200, undecodable body) are still logged at Error level via slog so they
+// reach Application Insights — silent to the caller, not silent to us. A missing token
+// or an upstream response with no usable data isn't logged: those are expected outcomes,
+// not failures.
 package whois
 
 import (
 	"container/list"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"os"
 	"sync"
@@ -200,22 +205,26 @@ func Lookup(ctx context.Context, hostname string) *Info {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://whoisjson.com/api/v1/whois?domain="+domain, nil)
 	if err != nil {
+		slog.ErrorContext(ctx, "whois: building request failed", "domain", domain, "err", err)
 		return nil
 	}
 	req.Header.Set("Authorization", "TOKEN="+token)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
+		slog.ErrorContext(ctx, "whois: request failed", "domain", domain, "err", err)
 		return nil
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		slog.ErrorContext(ctx, "whois: non-200 response", "domain", domain, "status", resp.StatusCode)
 		return nil
 	}
 
 	var raw map[string]json.RawMessage
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		slog.ErrorContext(ctx, "whois: decoding response failed", "domain", domain, "err", err)
 		return nil
 	}
 

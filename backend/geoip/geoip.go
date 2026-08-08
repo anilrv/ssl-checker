@@ -1,7 +1,10 @@
 // Package geoip does a best-effort IP -> country/network lookup via ipgeolocation.io.
 // Every failure mode (missing token, timeout, rate limit, bad response) is swallowed
 // here — callers only ever see a nil *Info, never an error, since this is purely
-// supplementary context and must never affect the main certificate check.
+// supplementary context and must never affect the main certificate check. Genuine
+// lookup failures (network error, non-200, undecodable body) are still logged at Error
+// level via slog so they reach Application Insights — silent to the caller, not silent
+// to us. A missing token isn't logged: that's an expected outcome, not a failure.
 package geoip
 
 import (
@@ -10,6 +13,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -141,16 +145,19 @@ func Lookup(ctx context.Context, ip net.IP) *Info {
 	reqURL := "https://api.ipgeolocation.io/v3/ipgeo?apiKey=" + url.QueryEscape(token) + "&ip=" + url.QueryEscape(key)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
+		slog.ErrorContext(ctx, "geoip: building request failed", "ip", key, "err", err)
 		return nil
 	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
+		slog.ErrorContext(ctx, "geoip: request failed", "ip", key, "err", err)
 		return nil
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		slog.ErrorContext(ctx, "geoip: non-200 response", "ip", key, "status", resp.StatusCode)
 		return nil
 	}
 
@@ -167,6 +174,7 @@ func Lookup(ctx context.Context, ip net.IP) *Info {
 		} `json:"asn"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		slog.ErrorContext(ctx, "geoip: decoding response failed", "ip", key, "err", err)
 		return nil
 	}
 
