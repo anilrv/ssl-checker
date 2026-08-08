@@ -2,6 +2,10 @@
 
 Paste these into the Developer Dashboard submission form; edit freely.
 
+The Chrome Web Store has no separate changelog field, so "WHAT'S NEW IN X.X.X" lives
+inside the description below — replace it (don't accumulate old entries) each time you
+bump the version and re-upload.
+
 ## Summary (short description, ≤132 chars)
 
 Check the current site's TLS certificate — organization, issuer, validity, and issues like expired or self-signed certs.
@@ -10,6 +14,10 @@ Check the current site's TLS certificate — organization, issuer, validity, and
 
 SSL Issue Checker inspects the TLS/SSL certificate of the site in your active tab — with a live, real TLS handshake, not a cached third-party lookup — and shows you everything that matters at a glance.
 
+WHAT'S NEW IN 2.1.1
+
+• The Hosting section now shows the site's resolved server IP address (IPv4 or IPv6), alongside its location and network operator.
+
 WHAT IT SHOWS
 
 SSL / Certificate
@@ -17,9 +25,11 @@ SSL / Certificate
 • Validity dates — when it was issued and when it expires, with friendly durations ("in 2m 20d")
 • Negotiated TLS protocol and cipher suite
 • Certificate chain length, completeness, and trust status
+• Revocation status — checked live against the issuing CA's OCSP responder and/or certificate revocation list (CRL), so a revoked certificate is flagged even if the site still serves it
 • OCSP stapling, TLS handshake time, and the hostnames the certificate covers
 
 Hosting
+• Resolved server IP address (IPv4 or IPv6)
 • Server software (Server / X-Powered-By headers) and HTTP/2 support
 • Approximate server location (city and country, with a flag)
 • Network operator (ASN), linked to Cloudflare Radar
@@ -30,7 +40,7 @@ Domain
 
 ISSUES, CALLED OUT CLEARLY
 
-Expired or not-yet-valid certificates, self-signed certificates, hostname mismatches, incomplete certificate chains, untrusted roots, outdated TLS 1.0 support, and missing HTTPS. Domain-age warnings catch a common phishing pattern: a site whose domain was registered less than 10 days ago is flagged red, and less than 30 days ago yellow. You also get an early heads-up when the certificate — or the domain registration itself — is within 14 days of expiring. Every issue carries a severity level, summarized as a coloured badge on the toolbar icon.
+Expired or not-yet-valid certificates, self-signed certificates, hostname mismatches, incomplete certificate chains, untrusted roots, revoked certificates, weak cryptography (SHA-1/MD5 signatures, RSA keys under 2048 bits), outdated TLS 1.0 support, and missing HTTPS. Domain-age warnings catch a common phishing pattern: a site whose domain was registered less than 10 days ago is flagged red, and less than 30 days ago yellow. You also get an early heads-up when the certificate — or the domain registration itself — is within 14 days of expiring. Every issue carries a severity level, summarized as a coloured badge on the toolbar icon.
 
 TWO WAYS TO VIEW
 
