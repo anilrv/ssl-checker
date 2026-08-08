@@ -188,9 +188,12 @@ func Lookup(ctx context.Context, hostname string) *Info {
 	}
 	// Durable rows written before per-entry TTL capping (or written just inside the
 	// minCacheTTL floor) can outlive the registration they describe; treat those as
-	// misses rather than serving lapsed data.
+	// misses rather than serving lapsed data. Rows written before the isEmpty guard
+	// below existed can also carry a "successful" empty Info (zero Expires, so it'd
+	// otherwise pass the freshness check here) — also treated as a miss so it retries
+	// instead of serving no-data for whatever's left of its original 30-day TTL.
 	if info, ok := durablecache.Get[Info](ctx, cacheTable, cachePartition, domain); ok &&
-		(info.Expires.IsZero() || time.Now().Before(info.Expires)) {
+		(info.Expires.IsZero() || time.Now().Before(info.Expires)) && !isEmpty(info) {
 		cache.Set(domain, info, cappedTTL(cacheTTL, info.Expires))
 		return &info
 	}
@@ -256,8 +259,7 @@ func Lookup(ctx context.Context, hostname string) *Info {
 	// registry whoisjson.com has no usable data for — and caching it would freeze
 	// "no domain info" in place for the full 30-day TTL instead of self-healing on
 	// the next request.
-	if info.RegistrarName == "" && info.OwnerOrg == "" && len(info.DetectedProviders) == 0 &&
-		info.Created.IsZero() && info.Expires.IsZero() {
+	if isEmpty(info) {
 		return nil
 	}
 
@@ -265,4 +267,12 @@ func Lookup(ctx context.Context, hostname string) *Info {
 	cache.Set(domain, info, ttl)
 	go durablecache.Set(context.Background(), cacheTable, cachePartition, domain, info, ttl)
 	return &info
+}
+
+// isEmpty reports whether info carries no usable data at all — a "successful" lookup
+// with every field at its zero value, which is not meaningfully different from a failed
+// one and must not be cached (or trusted from a previously-cached row) as if it were.
+func isEmpty(info Info) bool {
+	return info.RegistrarName == "" && info.OwnerOrg == "" && len(info.DetectedProviders) == 0 &&
+		info.Created.IsZero() && info.Expires.IsZero()
 }
