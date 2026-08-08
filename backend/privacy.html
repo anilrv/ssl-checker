@@ -21,7 +21,7 @@
 </head>
 <body>
 <h1>Privacy Policy — SSL Issue Checker</h1>
-<p class="updated">Last updated: 2026-07-19</p>
+<p class="updated">Last updated: 2026-08-08</p>
 
 <p>SSL Issue Checker is a Chrome extension that checks the TLS/SSL certificate of the site in your active browser tab and reports its organization, issuer, validity, and any certificate issues, along with additional hosting and domain-registration details described below.</p>
 
@@ -51,9 +51,10 @@
 <p>These lookups are cached on our backend (server IPs for up to 7 days, domains for up to 30 days, CA revocation lists for up to 6 hours) purely to reduce repeat calls, and none of these services receive any information about you, your browser, or your IP address — only the hostname, IP, or certificate already being checked.</p>
 
 <h2>Infrastructure and service providers</h2>
-<p>For full transparency, this service runs on the following infrastructure. None of these providers receive more than what's described, and none are used for analytics or advertising:</p>
+<p>For full transparency, this service runs on the following infrastructure. None of these providers receive more than what's described, and none are used for advertising or tracking you across sites:</p>
 <ul>
   <li><strong>Microsoft Azure</strong> — hosts the backend (an Azure Function). As the hosting platform it processes each request — the checked hostname and standard connection metadata — under Azure's own platform logging.</li>
+  <li><strong>Microsoft Azure Application Insights</strong> — when one of the additional lookups above (network/location or domain-registration) fails or returns an unusable response, our backend logs that failure — the hostname or IP being looked up, and the reason it failed — to this monitoring service so we can diagnose the issue. Successful lookups are not logged here; this only records failures, for troubleshooting.</li>
   <li><strong>Cloudflare</strong> — provides DNS for the backend's domain and proxies traffic to it. As a proxy it sees your IP address and the hostname being checked in transit, like any CDN, subject to Cloudflare's own privacy policy.</li>
   <li><strong>Cloudflare DNS and Google Public DNS (DNS-over-HTTPS)</strong> — the backend resolves the checked site's hostname through these public resolvers before probing it. These queries originate from our backend, contain only the hostname being checked, and carry nothing about you, your browser, or your IP address.</li>
 </ul>
@@ -62,7 +63,7 @@
 <ul>
   <li>The extension stores its access token locally on your device via <code>chrome.storage.local</code> — this never leaves your device except when presented back to the backend to authenticate a check request.</li>
   <li>Whether you've turned floating view on or off is also stored locally via <code>chrome.storage.local</code>.</li>
-  <li>The backend keeps a short-lived cache of recent check results and the lookups above (hostname/IP/domain and the resulting certificate, hosting, and registration metadata — up to 24 hours for check results, 7 days for network/location data, and 30 days for domain-registration data), purely to avoid re-checking the same site repeatedly. This cache is stored in Azure Table Storage under the same Microsoft Azure account already described in "Infrastructure and service providers" above, so it can survive the backend restarting. It is not tied to your identity, browser, or IP address, and there is no analytics or logging platform attached to it — only the same bounded cache described here.</li>
+  <li>The backend keeps a short-lived cache of recent check results and the lookups above (hostname/IP/domain and the resulting certificate, hosting, and registration metadata — up to 24 hours for check results, 7 days for network/location data, and 30 days for domain-registration data), purely to avoid re-checking the same site repeatedly. This cache is stored in Azure Table Storage under the same Microsoft Azure account already described in "Infrastructure and service providers" above, so it can survive the backend restarting. It is not tied to your identity, browser, or IP address, and nothing about the cache itself is sent to any analytics or logging platform — the only logging that exists is the failure logging to Application Insights described above, which is separate from this cache.</li>
 </ul>
 
 <h2>Permissions justification</h2>
