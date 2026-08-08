@@ -139,21 +139,30 @@ var cache = newWhoisCache(500)
 
 var httpClient = &http.Client{}
 
-// registrarResponse mirrors only the fields we use from whoisjson.com's response.
-type registrarResponse struct {
-	Registrar struct {
-		Name string `json:"name"`
-	} `json:"registrar"`
-	Created    string `json:"created"`
-	Expires    string `json:"expires"`
-	NSAnalysis struct {
-		DetectedProviders []string `json:"detectedProviders"`
-	} `json:"nsAnalysis"`
-	Contacts struct {
-		Owner []struct {
-			Organization string `json:"organization"`
-		} `json:"owner"`
-	} `json:"contacts"`
+// Decoded field-by-field, not into one struct: whoisjson.com sends "contacts" as
+// {"owner": [...]} normally but as a bare [] for privacy-redacted domains, and a single
+// field's shape mismatch would otherwise fail encoding/json's decode of the whole object
+// — discarding registrar/created/expires along with it even though those decoded fine.
+type registrarField struct {
+	Name string `json:"name"`
+}
+
+type nsAnalysisField struct {
+	DetectedProviders []string `json:"detectedProviders"`
+}
+
+type contactsField struct {
+	Owner []struct {
+		Organization string `json:"organization"`
+	} `json:"owner"`
+}
+
+// decodeField unmarshals raw[key] into dst, leaving dst untouched if the key is absent
+// or its value doesn't match dst's shape.
+func decodeField(raw map[string]json.RawMessage, key string, dst any) {
+	if v, ok := raw[key]; ok {
+		_ = json.Unmarshal(v, dst)
+	}
 }
 
 // Lookup returns domain registration info for hostname, or nil if unavailable for any
@@ -205,23 +214,42 @@ func Lookup(ctx context.Context, hostname string) *Info {
 		return nil
 	}
 
-	var body registrarResponse
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil
 	}
 
+	var registrar registrarField
+	decodeField(raw, "registrar", &registrar)
+	var nsAnalysis nsAnalysisField
+	decodeField(raw, "nsAnalysis", &nsAnalysis)
+	var contacts contactsField
+	decodeField(raw, "contacts", &contacts)
+	var created, expires string
+	decodeField(raw, "created", &created)
+	decodeField(raw, "expires", &expires)
+
 	info := Info{
-		RegistrarName:     body.Registrar.Name,
-		DetectedProviders: body.NSAnalysis.DetectedProviders,
+		RegistrarName:     registrar.Name,
+		DetectedProviders: nsAnalysis.DetectedProviders,
 	}
-	if t, err := time.Parse(whoisTimeLayout, body.Created); err == nil {
+	if t, err := time.Parse(whoisTimeLayout, created); err == nil {
 		info.Created = t
 	}
-	if t, err := time.Parse(whoisTimeLayout, body.Expires); err == nil {
+	if t, err := time.Parse(whoisTimeLayout, expires); err == nil {
 		info.Expires = t
 	}
-	if len(body.Contacts.Owner) > 0 {
-		info.OwnerOrg = body.Contacts.Owner[0].Organization
+	if len(contacts.Owner) > 0 {
+		info.OwnerOrg = contacts.Owner[0].Organization
+	}
+
+	// A 200 with none of these fields populated isn't a successful lookup — e.g. a
+	// registry whoisjson.com has no usable data for — and caching it would freeze
+	// "no domain info" in place for the full 30-day TTL instead of self-healing on
+	// the next request.
+	if info.RegistrarName == "" && info.OwnerOrg == "" && len(info.DetectedProviders) == 0 &&
+		info.Created.IsZero() && info.Expires.IsZero() {
+		return nil
 	}
 
 	ttl := cappedTTL(cacheTTL, info.Expires)

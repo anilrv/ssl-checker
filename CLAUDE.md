@@ -105,6 +105,17 @@ already does that.
   bug (Server header silently empty for every h2 site, i.e. most of the modern web) before
   the branch existed — if you touch this function, keep both paths and test against an h2
   site (e.g. `www.google.com`) and a `http/1.1` one (e.g. `self-signed.badssl.com`).
+- **`whois.go` decodes whoisjson.com's response field-by-field, not into one struct.**
+  Their JSON shape is inconsistent across registries — e.g. `contacts` is normally
+  `{"owner": [...]}` but a bare `[]` for privacy-redacted domains — and `encoding/json`
+  aborts decoding the *entire* object on a single field's type mismatch. This was a real
+  shipped bug: `dominos.co.in` had valid `registrar`/`created`/`expires` in the response,
+  but the `contacts: []` shape mismatch threw all of it away and `Lookup` returned `nil`.
+  Each field is now decoded independently via `json.RawMessage`/`decodeField`, so one
+  field's shape surprise degrades only that field. A decoded `Info` with every field still
+  empty is treated as no lookup at all (returns `nil`, uncached) rather than a "successful"
+  empty result — the latter would otherwise freeze "no domain info" in the cache for the
+  full 30-day TTL.
 - **The backend owns issue metadata.** `issueCatalog` in `main.go` maps every issue code
   to its label and severity, and `setIssues` ships them per-result as `issueDetails`
   alongside the bare `issues` codes. The extension renders from `issueDetails` and treats
