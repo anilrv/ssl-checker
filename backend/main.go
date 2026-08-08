@@ -116,6 +116,7 @@ type CheckResult struct {
 	HandshakeMs  int64  `json:"handshakeMs,omitempty"`
 	Server       string `json:"server,omitempty"`
 	PoweredBy    string `json:"poweredBy,omitempty"`
+	ResolvedIP   string `json:"resolvedIP,omitempty"` // the IP (v4 or v6) the hostname resolved to for this check
 
 	GeoCountry     string `json:"geoCountry,omitempty"`
 	GeoCountryCode string `json:"geoCountryCode,omitempty"`
@@ -567,6 +568,7 @@ func performCheck(ctx context.Context, hostname string) CheckResult {
 		setIssues(&result, []string{"resolve-failed"})
 		return result
 	}
+	result.ResolvedIP = ip.String()
 
 	// whois.Lookup, like geoip.Lookup below, only starts once DNS resolution has
 	// confirmed a public IP — never blind/concurrent with it — so a hostname that fails

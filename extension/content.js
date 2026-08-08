@@ -545,13 +545,14 @@ function renderFull(host, shadow, pos) {
           : ''
       }
       ${
-        r.protocol || r.chainLength || r.geoCountry || r.geoAsn || r.geoAsName
+        r.protocol || r.chainLength || r.geoCountry || r.geoAsn || r.geoAsName || r.resolvedIP
           ? `<details>
               <summary>Hosting</summary>
               <div class="rows">
                 ${r.protocol || r.chainLength ? row('Server', escapeHtml(r.server || 'Not disclosed')) : ''}
                 ${r.poweredBy ? row('Powered By', escapeHtml(r.poweredBy)) : ''}
                 ${r.protocol || r.chainLength ? row('HTTP/2', r.http2 ? 'Yes' : 'No') : ''}
+                ${r.resolvedIP ? row('IP Address', escapeHtml(r.resolvedIP)) : ''}
                 ${locationRow(r)}
                 ${networkRow(r)}
               </div>

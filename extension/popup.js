@@ -252,13 +252,14 @@ function render(tab, result) {
     techRowsEl.innerHTML = '';
   }
 
-  const hasHosting = hasProbe || result.geoCountry || result.geoAsn || result.geoAsName;
+  const hasHosting = hasProbe || result.geoCountry || result.geoAsn || result.geoAsName || result.resolvedIP;
   if (hasHosting) {
     hostingEl.style.display = '';
     hostingRowsEl.innerHTML =
       (hasProbe ? row('Server', escapeHtml(result.server || 'Not disclosed'), 'mono') : '') +
       (result.poweredBy ? row('Powered By', escapeHtml(result.poweredBy), 'mono') : '') +
       (hasProbe ? row('HTTP/2', result.http2 ? 'Yes' : 'No', 'mono') : '') +
+      (result.resolvedIP ? row('IP Address', escapeHtml(result.resolvedIP), 'mono') : '') +
       locationRow(result) +
       networkRow(result);
   } else {
