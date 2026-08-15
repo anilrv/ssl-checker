@@ -1,0 +1,121 @@
+{
+  "extDescription": {
+    "message": "Shows the SSL/TLS certificate organization and flags certificate issues for the current site.",
+    "description": "Extension description shown in the Chrome Web Store and chrome://extensions"
+  },
+
+  "language_auto": {
+    "message": "Auto (match browser)",
+    "description": "Language-picker option that reverts to the browser's own UI language instead of a manually forced one"
+  },
+
+  "label_organization": { "message": "Organization" },
+  "label_org_short": { "message": "ORG" },
+  "label_issuer_short": { "message": "ISSUER" },
+  "label_issuer": { "message": "Issuer" },
+  "label_protocol": { "message": "Protocol" },
+  "label_created": { "message": "Created" },
+  "label_expires": { "message": "Expires" },
+  "label_chain": { "message": "Chain" },
+  "label_ocsp_stapled": { "message": "OCSP Stapled" },
+  "label_handshake": { "message": "Handshake" },
+  "label_covers": { "message": "Covers" },
+  "label_server": { "message": "Server" },
+  "label_powered_by": { "message": "Powered By" },
+  "label_http2": { "message": "HTTP/2" },
+  "label_ip_address": { "message": "IP Address" },
+  "label_location": { "message": "Location" },
+  "label_network": { "message": "Network" },
+  "label_registrar": { "message": "Registrar" },
+  "label_dns_provider": { "message": "DNS Provider" },
+  "label_owner": { "message": "Owner" },
+
+  "value_yes": { "message": "Yes" },
+  "value_no": { "message": "No" },
+  "value_not_disclosed": { "message": "Not disclosed" },
+
+  "section_ssl": { "message": "SSL" },
+  "section_hosting": { "message": "Hosting" },
+  "section_domain": { "message": "Domain" },
+
+  "verdict_no_scan_data": {
+    "message": "No scan data yet for this tab.",
+    "description": "Shown in the popup when no result is cached for the active tab"
+  },
+  "verdict_could_not_fully_check": {
+    "message": "Could not fully check this site",
+    "description": "Fallback verdict when a check failed without a specific error message"
+  },
+  "verdict_no_issues": { "message": "No issues found" },
+  "verdict_issue_singular": { "message": "1 issue found" },
+  "verdict_issues_plural": {
+    "message": "$COUNT$ issues found",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "checking_full": {
+    "message": "Waiting for the certificate check to finish…",
+    "description": "Floating panel (full view) placeholder while a check is in flight"
+  },
+  "checking_compact": {
+    "message": "Checking…",
+    "description": "Floating panel (compact view) placeholder while a check is in flight"
+  },
+
+  "chain_trusted": { "message": "trusted" },
+  "chain_untrusted_root": { "message": "untrusted root" },
+  "chain_incomplete": { "message": "incomplete" },
+  "chain_certs_singular": {
+    "message": "$COUNT$ cert",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "chain_certs_plural": {
+    "message": "$COUNT$ certs",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+
+  "title_rescan": { "message": "Re-scan" },
+  "title_float_view_show": { "message": "Show floating view on page" },
+  "title_float_view_hide": { "message": "Turn off floating view" },
+  "title_float_view_unavailable": { "message": "Floating view isn't available on this page" },
+  "title_expand": { "message": "Expand" },
+  "title_compact_view": { "message": "Compact view" },
+  "title_ipinfo_link": { "message": "View on ipinfo.io" },
+  "title_cloudflare_radar_link": { "message": "View on Cloudflare Radar" },
+  "title_language_switch": { "message": "Change language" },
+
+  "error_function_key_rejected": {
+    "message": "Function key was rejected by the backend.",
+    "description": "Shown when the backend rejects the function key after a re-bootstrap attempt"
+  },
+  "error_could_not_reach_service": {
+    "message": "Could not reach the checking service: $DETAIL$",
+    "placeholders": { "detail": { "content": "$1" } }
+  },
+  "error_check_failed": {
+    "message": "Check failed (HTTP $STATUS$)",
+    "placeholders": { "status": { "content": "$1" } }
+  },
+
+  "error_code_invalid_host": {
+    "message": "Invalid or missing hostname",
+    "description": "Backend errorCode 'invalid-host' — see writeJSONError call sites in backend/main.go"
+  },
+  "error_code_rate_limited": {
+    "message": "Rate limit exceeded, try again shortly",
+    "description": "Backend errorCode 'rate-limited'"
+  },
+  "error_code_server_not_configured": {
+    "message": "The checking service is temporarily unavailable",
+    "description": "Backend errorCode 'server-not-configured' (missing CHECKSSL_KEY app setting) — kept vague for end users, the specific cause is an ops-side misconfiguration"
+  },
+
+  "tooltip_no_https_suffix": {
+    "message": "— no HTTPS",
+    "description": "Appended to the toolbar icon tooltip for http:// pages"
+  },
+  "tooltip_ssl_prefix": {
+    "message": "SSL: $ISSUER$",
+    "description": "Toolbar icon tooltip showing the certificate issuer organization",
+    "placeholders": { "issuer": { "content": "$1" } }
+  }
+}

@@ -1,4 +1,5 @@
 import { getFunctionUrl, fetchFunctionKey, ensureFunctionKey, buildCheckUrl } from './lib/config.js';
+import { t, loadStoredOverride } from './lib/i18n.js';
 
 const DEFAULT_TITLE = 'SSL Issue Checker';
 
@@ -53,6 +54,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 async function handleTab(tabId, url) {
+  // MV3 service workers must register their event listeners synchronously at module top
+  // level (a top-level await here, before the listeners further up are registered, risks
+  // Chrome not recognizing them in time on a cold wake) — so the override is loaded lazily,
+  // on first use inside this event-triggered handler instead. loadStoredOverride() caches
+  // its own promise, so every call after the first one resolves immediately.
+  await loadStoredOverride();
+
   if (!/^https?:\/\//i.test(url)) {
     clearIndicators(tabId);
     latestResults.delete(tabId);
@@ -60,7 +68,7 @@ async function handleTab(tabId, url) {
   }
   if (url.startsWith('http://')) {
     updateBadge(tabId, ['no-https']);
-    chrome.action.setTitle({ tabId, title: `${DEFAULT_TITLE} — no HTTPS` });
+    chrome.action.setTitle({ tabId, title: `${DEFAULT_TITLE} ${t('tooltip_no_https_suffix')}` });
     latestResults.delete(tabId);
     return;
   }
@@ -137,6 +145,6 @@ function updateBadge(tabId, issues, result) {
 }
 
 function updateTooltip(tabId, result) {
-  const title = result.issuerOrg ? `SSL: ${result.issuerOrg}` : DEFAULT_TITLE;
+  const title = result.issuerOrg ? t('tooltip_ssl_prefix', [result.issuerOrg]) : DEFAULT_TITLE;
   chrome.action.setTitle({ tabId, title });
 }

@@ -1,0 +1,107 @@
+{
+  "extDescription": {
+    "message": "Ziyaret ettiğiniz sitenin SSL/TLS sertifikasını veren kuruluşu gösterir ve sertifika sorunlarını tespit eder."
+  },
+
+  "label_organization": { "message": "Kuruluş" },
+  "label_org_short": { "message": "KURUM" },
+  "label_issuer_short": { "message": "VEREN" },
+  "label_issuer": { "message": "Veren Kuruluş" },
+  "label_protocol": { "message": "Protokol" },
+  "label_created": { "message": "Oluşturulma" },
+  "label_expires": { "message": "Bitiş" },
+  "label_chain": { "message": "Zincir" },
+  "label_ocsp_stapled": { "message": "OCSP Ekli" },
+  "label_handshake": { "message": "El Sıkışma" },
+  "label_covers": { "message": "Kapsam" },
+  "label_server": { "message": "Sunucu" },
+  "label_powered_by": { "message": "Destekleyen" },
+  "label_http2": { "message": "HTTP/2" },
+  "label_ip_address": { "message": "IP Adresi" },
+  "label_location": { "message": "Konum" },
+  "label_network": { "message": "Ağ" },
+  "label_registrar": { "message": "Kayıt Kuruluşu" },
+  "label_dns_provider": { "message": "DNS Sağlayıcı" },
+  "label_owner": { "message": "Sahip" },
+
+  "value_yes": { "message": "Evet" },
+  "value_no": { "message": "Hayır" },
+  "value_not_disclosed": { "message": "Belirtilmemiş" },
+
+  "section_ssl": { "message": "SSL" },
+  "section_hosting": { "message": "Barındırma" },
+  "section_domain": { "message": "Alan Adı" },
+
+  "verdict_no_scan_data": { "message": "Bu sekme için henüz tarama verisi yok." },
+  "verdict_could_not_fully_check": { "message": "Bu site tam olarak kontrol edilemedi" },
+  "verdict_no_issues": { "message": "Sorun bulunamadı" },
+  "verdict_issue_singular": { "message": "1 sorun bulundu" },
+  "verdict_issues_plural": {
+    "message": "$COUNT$ sorun bulundu",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "checking_full": { "message": "Sertifika kontrolünün bitmesi bekleniyor…" },
+  "checking_compact": { "message": "Kontrol ediliyor…" },
+
+  "chain_trusted": { "message": "güvenilir" },
+  "chain_untrusted_root": { "message": "güvenilmeyen kök" },
+  "chain_incomplete": { "message": "eksik" },
+  "chain_certs_singular": {
+    "message": "$COUNT$ sertifika",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "chain_certs_plural": {
+    "message": "$COUNT$ sertifika",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+
+  "title_rescan": { "message": "Yeniden Tara" },
+  "title_float_view_show": { "message": "Sayfada yüzen görünümü göster" },
+  "title_float_view_hide": { "message": "Yüzen görünümü kapat" },
+  "title_float_view_unavailable": { "message": "Yüzen görünüm bu sayfada kullanılamıyor" },
+  "title_expand": { "message": "Genişlet" },
+  "title_compact_view": { "message": "Kompakt görünüm" },
+  "title_ipinfo_link": { "message": "ipinfo.io'da görüntüle" },
+  "title_cloudflare_radar_link": { "message": "Cloudflare Radar'da görüntüle" },
+  "title_language_switch": { "message": "Dili değiştir" },
+
+  "error_function_key_rejected": { "message": "İşlev anahtarı sunucu tarafından reddedildi." },
+  "error_could_not_reach_service": {
+    "message": "Kontrol servisine ulaşılamadı: $DETAIL$",
+    "placeholders": { "detail": { "content": "$1" } }
+  },
+  "error_check_failed": {
+    "message": "Kontrol başarısız oldu (HTTP $STATUS$)",
+    "placeholders": { "status": { "content": "$1" } }
+  },
+
+  "error_code_invalid_host": { "message": "Geçersiz veya eksik ana bilgisayar adı" },
+  "error_code_rate_limited": { "message": "İstek sınırı aşıldı, lütfen kısa süre sonra tekrar deneyin" },
+  "error_code_server_not_configured": { "message": "Kontrol servisi geçici olarak kullanılamıyor" },
+
+  "tooltip_no_https_suffix": { "message": "— HTTPS yok" },
+  "tooltip_ssl_prefix": {
+    "message": "SSL: $ISSUER$",
+    "placeholders": { "issuer": { "content": "$1" } }
+  },
+
+  "issue_no_https": { "message": "HTTPS yok — bağlantı şifrelenmemiş" },
+  "issue_expired": { "message": "Sertifikanın süresi dolmuş" },
+  "issue_not_yet_valid": { "message": "Sertifika henüz geçerli değil" },
+  "issue_self_signed": { "message": "Sertifika kendinden imzalı görünüyor" },
+  "issue_incomplete_chain": { "message": "Sunucunun ara sertifikası eksik" },
+  "issue_untrusted_chain": { "message": "Zincir güvenilir bir kök sertifika otoritesine ulaşmıyor" },
+  "issue_hostname_mismatch": { "message": "Sertifika bu sitenin ana bilgisayar adını kapsamıyor" },
+  "issue_weak_protocol": { "message": "Sunucu hâlâ eski bir TLS protokolünü (TLS 1.0) kabul ediyor" },
+  "issue_revoked": { "message": "Sertifika, veren kuruluş tarafından iptal edilmiş" },
+  "issue_weak_signature": { "message": "Sertifika zayıf bir algoritmayla imzalanmış (SHA-1/MD5)" },
+  "issue_weak_key": { "message": "Sertifika zayıf bir RSA anahtarı kullanıyor (2048 bitten düşük)" },
+  "issue_recently_registered": { "message": "Alan adı 10 günden kısa süre önce tescil edilmiş" },
+  "issue_young_domain": { "message": "Alan adı 30 günden kısa süre önce tescil edilmiş" },
+  "issue_cert_expiring_soon": { "message": "Sertifikanın süresi 14 gün içinde doluyor" },
+  "issue_domain_expiring_soon": { "message": "Alan adı kaydının süresi 14 gün içinde doluyor" },
+  "issue_resolve_failed": { "message": "Bu ana bilgisayar adı çözümlenemedi" },
+  "issue_probe_failed": { "message": "Sertifika kontrolü için bağlantı kurulamadı" },
+
+  "language_auto": { "message": "Otomatik (tarayıcıya göre)" }
+}

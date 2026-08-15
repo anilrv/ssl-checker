@@ -419,13 +419,13 @@ func checkSSLHandler(w http.ResponseWriter, r *http.Request) {
 
 	hostname := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("host")))
 	if hostname == "" || !ssrfguard.ValidHostname(hostname) {
-		writeJSONError(w, http.StatusBadRequest, "invalid or missing 'host' query parameter")
+		writeJSONError(w, http.StatusBadRequest, "invalid-host", "invalid or missing 'host' query parameter")
 		return
 	}
 
 	clientIP := clientIPFrom(r)
 	if !limiter.Allow(clientIP, 20, time.Minute) {
-		writeJSONError(w, http.StatusTooManyRequests, "rate limit exceeded, try again shortly")
+		writeJSONError(w, http.StatusTooManyRequests, "rate-limited", "rate limit exceeded, try again shortly")
 		return
 	}
 
@@ -487,13 +487,13 @@ func bootstrapHandler(w http.ResponseWriter, r *http.Request) {
 
 	clientIP := clientIPFrom(r)
 	if !limiter.Allow("bootstrap:"+clientIP, 10, time.Minute) {
-		writeJSONError(w, http.StatusTooManyRequests, "rate limit exceeded, try again shortly")
+		writeJSONError(w, http.StatusTooManyRequests, "rate-limited", "rate limit exceeded, try again shortly")
 		return
 	}
 
 	key := os.Getenv("CHECKSSL_KEY")
 	if key == "" {
-		writeJSONError(w, http.StatusInternalServerError, "server not configured")
+		writeJSONError(w, http.StatusInternalServerError, "server-not-configured", "server not configured")
 		return
 	}
 
@@ -544,8 +544,11 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func writeJSONError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
+// code is a stable machine-readable identifier for msg, mirroring how issueCatalog gives
+// issues a code separate from their label — it's what lets the extension translate this
+// error client-side (by code) without the backend needing to know about locales at all.
+func writeJSONError(w http.ResponseWriter, status int, code, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg, "errorCode": code})
 }
 
 // ---- core check logic ----

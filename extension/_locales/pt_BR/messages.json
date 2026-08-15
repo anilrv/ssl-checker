@@ -1,0 +1,107 @@
+{
+  "extDescription": {
+    "message": "Exibe a organização do certificado SSL/TLS e sinaliza problemas de certificado do site atualmente aberto."
+  },
+
+  "language_auto": { "message": "Automático (idioma do navegador)" },
+
+  "label_organization": { "message": "Organização" },
+  "label_org_short": { "message": "ORG" },
+  "label_issuer_short": { "message": "EMISS." },
+  "label_issuer": { "message": "Emissor" },
+  "label_protocol": { "message": "Protocolo" },
+  "label_created": { "message": "Criado" },
+  "label_expires": { "message": "Expira" },
+  "label_chain": { "message": "Cadeia" },
+  "label_ocsp_stapled": { "message": "Grampeamento OCSP" },
+  "label_handshake": { "message": "Negociação" },
+  "label_covers": { "message": "Cobre" },
+  "label_server": { "message": "Servidor" },
+  "label_powered_by": { "message": "Fornecido por" },
+  "label_http2": { "message": "HTTP/2" },
+  "label_ip_address": { "message": "Endereço IP" },
+  "label_location": { "message": "Localização" },
+  "label_network": { "message": "Rede" },
+  "label_registrar": { "message": "Registrador" },
+  "label_dns_provider": { "message": "Provedor DNS" },
+  "label_owner": { "message": "Proprietário" },
+
+  "value_yes": { "message": "Sim" },
+  "value_no": { "message": "Não" },
+  "value_not_disclosed": { "message": "Não divulgado" },
+
+  "section_ssl": { "message": "SSL" },
+  "section_hosting": { "message": "Hospedagem" },
+  "section_domain": { "message": "Domínio" },
+
+  "verdict_no_scan_data": { "message": "Ainda não há dados de verificação para esta aba." },
+  "verdict_could_not_fully_check": { "message": "Não foi possível verificar este site completamente" },
+  "verdict_no_issues": { "message": "Nenhum problema encontrado" },
+  "verdict_issue_singular": { "message": "1 problema encontrado" },
+  "verdict_issues_plural": {
+    "message": "$COUNT$ problemas encontrados",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "checking_full": { "message": "Aguardando a conclusão da verificação do certificado…" },
+  "checking_compact": { "message": "Verificando…" },
+
+  "chain_trusted": { "message": "confiável" },
+  "chain_untrusted_root": { "message": "raiz não confiável" },
+  "chain_incomplete": { "message": "incompleta" },
+  "chain_certs_singular": {
+    "message": "$COUNT$ certificado",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "chain_certs_plural": {
+    "message": "$COUNT$ certificados",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+
+  "title_rescan": { "message": "Verificar novamente" },
+  "title_float_view_show": { "message": "Mostrar visualização flutuante na página" },
+  "title_float_view_hide": { "message": "Desativar visualização flutuante" },
+  "title_float_view_unavailable": { "message": "A visualização flutuante não está disponível nesta página" },
+  "title_expand": { "message": "Expandir" },
+  "title_compact_view": { "message": "Visualização compacta" },
+  "title_ipinfo_link": { "message": "Ver no ipinfo.io" },
+  "title_cloudflare_radar_link": { "message": "Ver no Cloudflare Radar" },
+  "title_language_switch": { "message": "Mudar idioma" },
+
+  "error_function_key_rejected": { "message": "A chave de função foi rejeitada pelo backend." },
+  "error_could_not_reach_service": {
+    "message": "Não foi possível acessar o serviço de verificação: $DETAIL$",
+    "placeholders": { "detail": { "content": "$1" } }
+  },
+  "error_check_failed": {
+    "message": "Falha na verificação (HTTP $STATUS$)",
+    "placeholders": { "status": { "content": "$1" } }
+  },
+
+  "error_code_invalid_host": { "message": "Nome de host inválido ou ausente" },
+  "error_code_rate_limited": { "message": "Limite de requisições excedido, tente novamente em breve" },
+  "error_code_server_not_configured": { "message": "O serviço de verificação está temporariamente indisponível" },
+
+  "tooltip_no_https_suffix": { "message": "— sem HTTPS" },
+  "tooltip_ssl_prefix": {
+    "message": "SSL: $ISSUER$",
+    "placeholders": { "issuer": { "content": "$1" } }
+  },
+
+  "issue_no_https": { "message": "Sem HTTPS — a conexão não está criptografada" },
+  "issue_expired": { "message": "O certificado expirou" },
+  "issue_not_yet_valid": { "message": "O certificado ainda não é válido" },
+  "issue_self_signed": { "message": "O certificado parece ser autoassinado" },
+  "issue_incomplete_chain": { "message": "O servidor está sem o certificado intermediário" },
+  "issue_untrusted_chain": { "message": "A cadeia de certificados não leva a uma autoridade raiz confiável" },
+  "issue_hostname_mismatch": { "message": "O certificado não cobre o nome de host deste site" },
+  "issue_weak_protocol": { "message": "O servidor ainda aceita um protocolo TLS desatualizado (TLS 1.0)" },
+  "issue_revoked": { "message": "O certificado foi revogado pelo emissor" },
+  "issue_weak_signature": { "message": "O certificado está assinado com um algoritmo fraco (SHA-1/MD5)" },
+  "issue_weak_key": { "message": "O certificado usa uma chave RSA fraca (menos de 2048 bits)" },
+  "issue_recently_registered": { "message": "O domínio foi registrado há menos de 10 dias" },
+  "issue_young_domain": { "message": "O domínio foi registrado há menos de 30 dias" },
+  "issue_cert_expiring_soon": { "message": "O certificado expira em 14 dias" },
+  "issue_domain_expiring_soon": { "message": "O registro do domínio expira em 14 dias" },
+  "issue_resolve_failed": { "message": "Não foi possível resolver este nome de host" },
+  "issue_probe_failed": { "message": "Não foi possível conectar para verificar o certificado" }
+}

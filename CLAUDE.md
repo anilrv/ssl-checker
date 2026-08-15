@@ -131,7 +131,21 @@ already does that.
   entry and the rule in `computeIssues`, never touch the extension maps. If a rule is
   time-based, also add its threshold-crossing instant to `resultTTL` as a **future-only**
   deadline (`futureDeadline`) — passing an already-crossed threshold into `cappedTTL`
-  would floor virtually every mature result to the 5-minute minimum.
+  would floor virtually every mature result to the 5-minute minimum. This precedence
+  extends into the extension's i18n layer too — see `issueInfo()` in popup.js/content.js
+  below — and `_locales/en/messages.json` deliberately carries no `issue_*` keys so this
+  invariant isn't silently broken for English users; see the extension i18n note below.
+- **HTTP-level errors (bad request, rate limit, misconfiguration) carry a stable `errorCode`
+  alongside the free-text `error` message**, for the same reason `issueDetails` gives issues
+  a code separate from their label: `writeJSONError(w, status, code, msg)` in `main.go`
+  writes `{"error": msg, "errorCode": code}` — current codes are `invalid-host`,
+  `rate-limited`, `server-not-configured`. This is a distinct mechanism from `issueDetails`
+  (these are raw non-200 HTTP responses that never become a `CheckResult` at all, e.g. the
+  request never got as far as `performCheck`), but the client-side precedence is the same:
+  `popup.js`'s `refresh()` translates by `errorCode` first, falls back to the backend's own
+  `error` text, then a generic HTTP-status message. `background.js` never surfaces this body
+  to the user (it just clears the toolbar badge/tooltip on a non-OK response), so only
+  `popup.js` needs this wiring today.
 - **Revocation checking is three-step and paranoid about its URLs**
   (`certprobe/revocation.go`): stapled OCSP → live OCSP → CRL, best-effort like
   geoip/whois, and only a definitive verdict is reported ("couldn't determine" stays
@@ -172,6 +186,58 @@ Manifest V3. Two independent surfaces read the same `CheckResult`:
   from `/api/bootstrap` and caches it in `chrome.storage.local`. The retry-on-401/403
   (re-bootstrap once, covers key rotation) lives in the callers — `background.js` and
   `popup.js` — not in this module.
+- `lib/i18n.js` / `_locales/<lang>/messages.json` — UI chrome localization. Only the
+  extension's own labels/buttons/verdicts translate; WHOIS, registrar, and issuer strings
+  stay whatever language the source data is in. Issue labels are translated **by code**
+  (`issue_<code with dashes turned to underscores>`), not by matching backend strings,
+  because the code is the stable part. `issueInfo()`'s precedence is: locale message for
+  this code (if non-empty) → the backend's `issueDetails` label → the local `ISSUE_LABELS`
+  fallback → the raw code. Severity/level is **never** taken from locale files, only from
+  the backend/local map — translation is a labeling concern, not a severity one.
+  `_locales/en/messages.json` deliberately omits every `issue_*` key so English keeps
+  reading straight from the backend catalog (see the note above) — add `issue_*` keys only
+  in non-`en` locale files. `chrome.i18n` has no plural support, so counted strings
+  (`$N$ issues found`, `$N$ certs`) use a manually-selected singular/plural key pair rather
+  than one templated string — this doesn't cover languages with more than two plural forms
+  (e.g. Russian's 1 / 2–4 / 5+), a known gap to revisit if it turns out to matter. Shipped
+  locales today: `en` (baseline), `de`, `zh_CN`, `tr`, `ja`, `ru`, `fr`, `pt_BR` — every non-`en` file must
+  carry all 57 `en` keys plus every `issue_*` key backend/main.go's `issueCatalog` defines
+  (17 as of this writing), with every `$NAME$` placeholder token preserved verbatim; a quick
+  Node script diffing `Object.keys()` against `en` (plus substring-checking each placeholder
+  token) catches key-name/placeholder drift, but **not** a locale file merely lagging behind
+  a newer backend issue code** — that only shows up as a code missing from all five locale
+  files at once, which the pairwise diff-against-`en` never surfaces since `en` doesn't carry
+  `issue_*` keys either. This was a real shipped gap: `revoked`/`weak-signature`/`weak-key`
+  were added to `issueCatalog` after the locale files were generated, so all five fell
+  through to the backend's raw English label for those three codes until caught by
+  real-browser testing and fixed. When adding a new issue code to `issueCatalog`, add its
+  `issue_<code>` translation to all five locale files in the same change — grep every locale
+  file for the new code's key as a checklist, don't rely on the diff script alone.
+  - **`chrome.i18n.getMessage()` is locked to the browser's own UI language** — there's no
+    browser API to force a different one at runtime. The in-popup language switcher
+    (`lib/i18n.js`, wired into the header's globe icon in `popup.js`) works around this by
+    fetching the chosen locale's `messages.json` itself (`chrome.runtime.getURL(...)` +
+    `fetch()`), caching the parsed object in `chrome.storage.local` as `uiMessagesOverride`
+    (so `background.js`/`content.js` can read it back without re-fetching), and replicating
+    chrome.i18n's own `$NAME$` placeholder substitution by hand against it. `t()` in
+    `lib/i18n.js` checks this override first; `content.js` duplicates the identical logic
+    inline (plain content script, can't `import`).
+  - **A missing key under an active override must return `''`, never fall through to
+    `chrome.i18n.getMessage()`.** That fallback is only correct in "auto" mode (no override —
+    ordinary browser-language behavior, including chrome.i18n's own `default_locale`
+    fallback chain). Once the user has explicitly picked a language, falling through to
+    `chrome.i18n.getMessage()` would read the *browser's* actual UI language instead — e.g.
+    picking "English" while Chrome itself is set to German would leak German text for every
+    key the `en` file omits, which includes every `issue_*` key, by design. This was a
+    real shipped bug during development; if you touch `t()` in `lib/i18n.js` or `content.js`,
+    keep the override-active branch from ever reaching the `chrome.i18n.getMessage()` line.
+  - **Fixed-width label columns (`.row .label` in `popup.css`, `.label` in `content.js`'s
+    full-panel styles) truncate with `text-overflow: ellipsis` and carry a `title=` with the
+    untruncated text** (set by `row()` in both files) — non-English labels can run
+    meaningfully longer than their English source (German "Powered By" → "Bereitgestellt
+    von", 18 chars vs. 12). Don't remove the ellipsis/`title` handling when touching these
+    rows; a fixed-width column with no overflow handling reads fine in English and silently
+    breaks in German/Russian/Turkish.
 
 ### Conventions that matter here
 
@@ -190,6 +256,16 @@ Manifest V3. Two independent surfaces read the same `CheckResult`:
 - Dates render via a calendar-aware year/month/day breakdown (`durationParts` in both
   `popup.js` and `content.js`), not a raw day-count divided by 30/365 — the latter drifts
   and can produce nonsense like "12m" instead of rolling over to a year.
+- **Third-party "view more" icons (ipinfo.io next to the IP address, ipinfo.io + Cloudflare
+  Radar next to the ASN) are bundled locally as data: URIs, never hotlinked.** Each icon's
+  source SVG lives in `icons/` (`ipinfo-pin.svg`, `cloudflare-icon.svg`) purely for
+  provenance/regeneration; the actual `IPINFO_ICON_DATA_URI`/`CLOUDFLARE_ICON_DATA_URI`
+  constants duplicated in `popup.js`/`content.js` are what's rendered. This avoids a live
+  third-party image request on every popup open/panel render (consistent with the geo
+  flag's own preference for an embedded `data:` URI) and sidesteps `web_accessible_resources`
+  entirely, which would otherwise let any page fingerprint that this specific extension is
+  installed by probing for its bundled resource. The shared `extLink(href, iconDataUri,
+  title)` helper builds the `<a><img></a>` markup once per surface.
 
 ### Local development
 

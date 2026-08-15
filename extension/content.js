@@ -2,6 +2,17 @@
 // draggable floating panel showing the current site's cert status, but only actually
 // shows it when the user has floating view turned on (chrome.storage.local
 // 'floatViewEnabled') — otherwise it just sits idle listening for that setting to change.
+// Bundled locally (source SVG in icons/ipinfo-pin.svg) instead of hotlinking ipinfo.io's
+// favicon — no third-party request just to show an icon next to the IP address row.
+const IPINFO_ICON_DATA_URI =
+  'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iTGF5ZXJfMSIgZGF0YS1uYW1lPSJMYXllciAxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MS43NSA3OC41MiI+CiAgPGRlZnM+CiAgICA8c3R5bGU+CiAgICAgIC5jbHMtMSB7CiAgICAgICAgZmlsbDogIzMwOTFjZjsKICAgICAgICBmaWxsLXJ1bGU6IGV2ZW5vZGQ7CiAgICAgICAgc3Ryb2tlLXdpZHRoOiAwcHg7CiAgICAgIH0KICAgIDwvc3R5bGU+CiAgPC9kZWZzPgogIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTM0LjQ0LDU5LjE4bDUuMDksNS45NSw1Ljg4LTUuMTUsNS43Ni01LjA0YzYuMTktNS40NSw5Ljk5LTEzLjE1LDEwLjU4LTIxLjQyLjU5LTguMjctMi4wOC0xNi40NS03LjQzLTIyLjc0QzQ4LjkzLDQuNTIsNDEuMzIuNjgsMzMuMTQuMDhjLTguMTgtLjYtMTYuMjYsMi4xMS0yMi40OCw3LjUyQzQuNDcsMTMuMDQuNjcsMjAuNzUuMDgsMjkuMDJjLS41OSw4LjI3LDIuMDgsMTYuNDUsNy40MywyMi43NGwyMC4zMSwyMy43NGMxLjgxLDIuMTIsMy43Miw0LjQyLDYuNjcsMS45N2wuMDktLjA3LjA5LS4wOGMyLjgyLTIuNjEuODUtNC44NC0uOTctNi45N2wtMS4yNy0xLjQ4LTE5LjA0LTIyLjI3Yy00LTQuNzEtNi0xMC44My01LjU1LTE3LjAyLjQ0LTYuMTksMy4yOS0xMS45Niw3LjkxLTE2LjA0LDQuNjYtNC4wNSwxMC43MS02LjA2LDE2LjgzLTUuNjIsNi4xMi40NSwxMS44MiwzLjMyLDE1Ljg2LDgsNCw0LjcxLDYsMTAuODMsNS41NiwxNy4wMi0uNDQsNi4xOS0zLjI5LDExLjk2LTcuOTEsMTYuMDRsLTUuNzYsNS4wNC01LjA5LTUuOTUtNS4wOS01Ljk1LTQuOTgtNS44MmMtMS4zLTEuNTUtMS45NS0zLjU2LTEuOC01LjU5LjE1LTIuMDMsMS4wNy0zLjkyLDIuNTgtNS4yNywxLjU0LTEuMzIsMy41Mi0xLjk3LDUuNTMtMS44MiwyLjAxLjE1LDMuODgsMS4wOCw1LjIxLDIuNjEsMS4xMSwxLjMyLDEuNzUsMi45OCwxLjgyLDQuNzEuMDcsMS43My0uNDMsMy40NC0xLjQyLDQuODUtLjA1LjA3LS4wOS4xMy0uMTQuMTktLjUxLjc0LS43NSwxLjYyLS43MSwyLjUyLjA1LjkuMzgsMS43NS45NiwyLjQzLDIuNTYsMi45OSw1LjM4LjkzLDYuODgtMS42LDEuNjctMi44MiwyLjQzLTYuMSwyLjE2LTkuMzgtLjI3LTMuMjgtMS41NS02LjM4LTMuNjctOC44OC0yLjY4LTMuMS02LjQ3LTUuMDEtMTAuNTMtNS4zMS00LjA3LS4zLTguMDgsMS4wNC0xMS4xOCwzLjcyLTMuMDcsMi43MS00Ljk1LDYuNTQtNS4yNSwxMC42Ni0uMjksNC4xMSwxLjAzLDguMTcsMy42OCwxMS4zMWw0Ljk4LDUuODIsNS4wOSw1Ljk0LDUuMDksNS45NWgwWiIvPgo8L3N2Zz4=';
+
+// Same rationale as IPINFO_ICON_DATA_URI: bundled locally (source SVG in
+// icons/cloudflare-icon.svg) instead of hotlinking, used for the Cloudflare Radar ASN link
+// in the Network row.
+const CLOUDFLARE_ICON_DATA_URI =
+  'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkxheWVyXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgMTIyLjg4IDU1LjU3IiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCAxMjIuODggNTUuNTciIHhtbDpzcGFjZT0icHJlc2VydmUiPjxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+PCFbQ0RBVEFbDQoJLnN0MHtmaWxsOiNGNDgxMjA7fQ0KCS5zdDF7ZmlsbDojRkFBRDNGO30NCgkuc3Qye2ZpbGw6I0ZGRkZGRjt9DQpdXT48L3N0eWxlPjxnPjxwb2x5Z29uIGNsYXNzPSJzdDIiIHBvaW50cz0iMTEyLjY1LDMzLjAzIDk3LjIsMjQuMTcgOTQuNTQsMjMuMDEgMzEuMzMsMjMuNDUgMzEuMzMsNTUuNTMgMTEyLjY1LDU1LjUzIDExMi42NSwzMy4wMyIvPjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik04NC41Miw1Mi41OGMwLjc2LTIuNTksMC40Ny00Ljk3LTAuNzktNi43M2MtMS4xNS0xLjYyLTMuMS0yLjU2LTUuNDQtMi42N0wzMy45Niw0Mi42IGMtMC4yOSwwLTAuNTQtMC4xNC0wLjY4LTAuMzZjLTAuMTQtMC4yMS0wLjE4LTAuNS0wLjExLTAuNzljMC4xNC0wLjQzLDAuNTgtMC43NiwxLjA0LTAuNzlsNDQuNzMtMC41OCBjNS4yOS0wLjI1LDExLjA2LTQuNTQsMTMuMDctOS44bDIuNTYtNi42NmMwLjExLTAuMjksMC4xNC0wLjU4LDAuMDctMC44NkM5MS43Niw5LjcyLDgwLjEzLDAsNjYuMjMsMCBjLTEyLjgyLDAtMjMuNyw4LjI4LTI3LjU5LDE5Ljc3Yy0yLjUyLTEuODctNS43My0yLjg4LTkuMTgtMi41NmMtNi4xNiwwLjYxLTExLjA5LDUuNTUtMTEuNywxMS43Yy0wLjE0LDEuNTgtMC4wNCwzLjEzLDAuMzIsNC41NyBDOC4wMywzMy43OCwwLDQxLjk5LDAsNTIuMTFjMCwwLjksMC4wNywxLjgsMC4xOCwyLjdjMC4wNywwLjQzLDAuNDMsMC43NiwwLjg2LDAuNzZoODEuODJjMC40NywwLDAuOS0wLjMyLDEuMDQtMC43OUw4NC41Miw1Mi41OCBMODQuNTIsNTIuNTh6Ii8+PHBhdGggY2xhc3M9InN0MSIgZD0iTTk4LjY0LDI0LjA5Yy0wLjQsMC0wLjgzLDAtMS4yMiwwLjA0Yy0wLjI5LDAtMC41NCwwLjIyLTAuNjUsMC41bC0xLjczLDYuMDFjLTAuNzYsMi41OS0wLjQ3LDQuOTcsMC43OSw2LjczIGMxLjE1LDEuNjIsMy4xLDIuNTYsNS40NCwyLjY3bDkuNDQsMC41OGMwLjI5LDAsMC41NCwwLjE0LDAuNjgsMC4zNmMwLjE0LDAuMjIsMC4xOCwwLjU0LDAuMTEsMC43OSBjLTAuMTQsMC40My0wLjU4LDAuNzYtMS4wNCwwLjc5bC05LjgzLDAuNThjLTUuMzMsMC4yNS0xMS4wNiw0LjU0LTEzLjA3LDkuNzlsLTAuNzIsMS44NGMtMC4xNCwwLjM2LDAuMTEsMC43MiwwLjUsMC43MmgzMy43OCBjMC40LDAsMC43Ni0wLjI1LDAuODYtMC42NWMwLjU4LTIuMDksMC45LTQuMjksMC45LTYuNTVDMTIyLjg4LDM0Ljk3LDExMiwyNC4wOSw5OC42NCwyNC4wOUw5OC42NCwyNC4wOXoiLz48L2c+PC9zdmc+';
+
 
 // Fallback only — the backend's issueDetails (issueCatalog in backend/main.go) is the
 // authority for labels and levels, so new rules ship without an extension update. This
@@ -40,6 +51,48 @@ function extensionAlive() {
   }
 }
 
+// Mirrors lib/i18n.js's override mechanism (see there for the full rationale): chrome.i18n
+// is locked to the browser's own UI language, so a manually-picked language means checking
+// this in-memory copy of the chosen locale's messages.json first. Seeded from
+// chrome.storage.local by the initial storage.local.get(...) below and kept in sync by the
+// storage.onChanged listener further down — this file can't import lib/i18n.js (plain
+// content script, no modules), so the logic is duplicated rather than shared.
+let overrideMessages = null;
+
+function applyPlaceholders(message, placeholders, substitutions) {
+  if (!placeholders) return message;
+  const subs = substitutions ? (Array.isArray(substitutions) ? substitutions : [substitutions]) : [];
+  let out = message;
+  for (const [name, def] of Object.entries(placeholders)) {
+    const m = /^\$(\d+)/.exec(def.content || '');
+    const idx = m ? parseInt(m[1], 10) - 1 : 0;
+    out = out.replace(new RegExp(`\\$${name.toUpperCase()}\\$`, 'g'), subs[idx] != null ? String(subs[idx]) : '');
+  }
+  return out;
+}
+
+// This is a plain (non-module) content script, so it can't import lib/i18n.js — the same
+// tiny wrapper is duplicated here instead, guarded the same way every other chrome.* call
+// in this file is: a dead extension context degrades to the backend/local-map label
+// rather than throwing.
+//
+// Falling through to chrome.i18n.getMessage() is ONLY correct when no override is active
+// (ordinary browser-language behavior) — see the matching comment on t() in lib/i18n.js for
+// why a missing key under an active override must return '' instead of leaking the
+// browser's actual UI language.
+function t(key, substitutions) {
+  if (!extensionAlive()) return '';
+  try {
+    if (overrideMessages) {
+      const entry = overrideMessages[key];
+      return entry && entry.message ? applyPlaceholders(entry.message, entry.placeholders, substitutions) : '';
+    }
+    return chrome.i18n.getMessage(key, substitutions) || '';
+  } catch (e) {
+    return '';
+  }
+}
+
 let floatViewEnabled = false;
 let compactMode = false;
 const currentHostname = location.hostname; // fixed for this page's lifetime — never reassigned
@@ -51,12 +104,22 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// Label/level for one issue code: backend-supplied issueDetails wins, local map is
-// the fallback (see the ISSUE_LABELS comment).
+// Label/level for one issue code. Precedence: a locale translation for this code (if
+// present) → the backend's issueDetails label (kept current without an extension update)
+// → the local fallback map → the raw code. Levels always come from the backend/local map,
+// never from locale files — severity isn't a translation concern.
+//
+// _locales/en/messages.json deliberately has NO issue_* keys: English already comes
+// straight from the backend, so defining them there would shadow every future wording
+// change to issueCatalog for English users forever. issue_* keys belong only in non-en
+// locale files.
 function issueInfo(result, code) {
   const fromBackend = ((result && result.issueDetails) || []).find((d) => d.code === code);
-  if (fromBackend) return { label: fromBackend.label, level: fromBackend.level };
-  return ISSUE_LABELS[code] || { label: code, level: 'warning' };
+  const fallback = ISSUE_LABELS[code];
+  const level = (fromBackend && fromBackend.level) || (fallback && fallback.level) || 'warning';
+  const localized = t(`issue_${code.replace(/-/g, '_')}`);
+  const label = localized || (fromBackend && fromBackend.label) || (fallback && fallback.label) || code;
+  return { label, level };
 }
 
 function overallStatus(result) {
@@ -94,9 +157,9 @@ function sealGlyph(status) {
 }
 
 function verdictText(r, status) {
-  if (status === 'info') return r.error || 'Could not fully check this site';
-  if (!r.issues || r.issues.length === 0) return 'No issues found';
-  return `${r.issues.length} issue${r.issues.length > 1 ? 's' : ''} found`;
+  if (status === 'info') return r.error || t('verdict_could_not_fully_check');
+  if (!r.issues || r.issues.length === 0) return t('verdict_no_issues');
+  return r.issues.length === 1 ? t('verdict_issue_singular') : t('verdict_issues_plural', [String(r.issues.length)]);
 }
 
 // Calendar-aware year/month/day breakdown between two instants (not a naive
@@ -129,6 +192,8 @@ function formatDuration(y, m, d) {
 // Returns pre-built safe HTML (dateStr is locale-formatted digits/punctuation, the
 // duration is our own digit+letter formatter — nothing derived from untrusted input),
 // so callers pass this straight into row() rather than through escapeHtml.
+// The y/m/d duration shorthand itself is deliberately not localized (see formatDuration) —
+// only the surrounding row labels are translated, not this compact date math.
 function fmtCreated(epochSeconds) {
   if (!epochSeconds) return '—';
   const createdMs = epochSeconds * 1000;
@@ -154,23 +219,49 @@ function fmtExpires(epochSeconds) {
 
 function fmtChain(r) {
   if (!r.chainLength) return '—';
-  const trust = r.chainVerified ? 'trusted' : r.chainComplete ? 'untrusted root' : 'incomplete';
-  return `${r.chainLength} cert${r.chainLength > 1 ? 's' : ''} · ${trust}`;
+  const trust = r.chainVerified ? t('chain_trusted') : r.chainComplete ? t('chain_untrusted_root') : t('chain_incomplete');
+  const certs = t(r.chainLength > 1 ? 'chain_certs_plural' : 'chain_certs_singular', [String(r.chainLength)]);
+  return `${certs} · ${trust}`;
 }
 
 function row(label, value) {
-  return `<div class="row"><span class="label">${escapeHtml(label)}</span><span class="value">${value}</span></div>`;
+  const safeLabel = escapeHtml(label);
+  return `<div class="row"><span class="label" title="${safeLabel}">${safeLabel}</span><span class="value">${value}</span></div>`;
+}
+
+// A small icon linking out to a third-party site that has more detail on the value in this
+// row (ipinfo.io, Cloudflare Radar). The icon is a locally-bundled data: URI, never a
+// hotlinked remote image — see IPINFO_ICON_DATA_URI/CLOUDFLARE_ICON_DATA_URI above.
+function extLink(href, iconDataUri, title) {
+  const safeTitle = escapeHtml(title);
+  return `<a class="ext-icon-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="${safeTitle}"><img class="ext-icon" src="${iconDataUri}" alt="${safeTitle}" /></a>`;
+}
+
+function ipRow(r) {
+  if (!r.resolvedIP) return '';
+  const ip = escapeHtml(r.resolvedIP);
+  const value = `${ip} ${extLink(`https://ipinfo.io/${r.resolvedIP}`, IPINFO_ICON_DATA_URI, t('title_ipinfo_link'))}`;
+  return row(t('label_ip_address'), value);
 }
 
 function networkRow(r) {
   if (!r.geoAsName && !r.geoAsn) return '';
   const asnNum = (r.geoAsn || '').replace(/^AS/i, '');
-  const asnLink = asnNum
-    ? `<a href="https://radar.cloudflare.com/asn/${encodeURIComponent(asnNum)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.geoAsn)}</a>`
-    : escapeHtml(r.geoAsn || '');
   const name = r.geoAsName ? escapeHtml(r.geoAsName) : '';
-  const value = name && asnNum ? `${name} (${asnLink})` : name || asnLink;
-  return row('Network', value);
+  const asnText = escapeHtml(r.geoAsn || '');
+  const base = name && asnText ? `${name} (${asnText})` : name || asnText;
+  // The ASN itself is plain text now — two small icon links (ipinfo.io, Cloudflare Radar)
+  // sit after it instead of making the ASN text itself a link, so both destinations are
+  // equally reachable rather than picking one to "win" the hyperlink.
+  const links = asnNum
+    ? extLink(`https://ipinfo.io/AS${encodeURIComponent(asnNum)}`, IPINFO_ICON_DATA_URI, t('title_ipinfo_link')) +
+      extLink(
+        `https://radar.cloudflare.com/asn/${encodeURIComponent(asnNum)}`,
+        CLOUDFLARE_ICON_DATA_URI,
+        t('title_cloudflare_radar_link')
+      )
+    : '';
+  return row(t('label_network'), `${base}${links}`);
 }
 
 // Flag rendering fallback chain: embedded data: URI (immune to COEP-isolated pages that
@@ -190,7 +281,9 @@ function flagHtml(r, cssClass) {
 }
 
 // Inline onerror= attributes would be subject to the host page's CSP, so the handlers
-// are attached programmatically after each render instead.
+// are attached programmatically after each render instead. The ext-icon-link images
+// (ipinfo.io, Cloudflare) are bundled data: URIs and can't fail to load, so this only
+// ever needs to handle the geo flag falling back to a country-code chip.
 function attachFlagFallbacks(shadow) {
   shadow.querySelectorAll('img').forEach((img) => {
     img.addEventListener('error', () => {
@@ -210,7 +303,7 @@ function attachFlagFallbacks(shadow) {
 function locationRow(r) {
   if (!r.geoCountry) return '';
   const place = r.geoCity ? `${r.geoCity}, ${r.geoCountry}` : r.geoCountry;
-  return row('Location', `${flagHtml(r, 'flag')}${escapeHtml(place)}`);
+  return row(t('label_location'), `${flagHtml(r, 'flag')}${escapeHtml(place)}`);
 }
 
 const SHARED_STYLES = `
@@ -416,10 +509,10 @@ function renderCompact(host, shadow, pos) {
     <div class="panel">
       <div class="content" id="drag-handle">
         <div class="button-stack">
-          <button class="iconbtn" id="expand-btn" title="Expand" aria-label="Expand">
+          <button class="iconbtn" id="expand-btn">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
           </button>
-          <button class="iconbtn close" id="close-btn" title="Turn off floating view" aria-label="Turn off floating view">✕</button>
+          <button class="iconbtn close" id="close-btn">✕</button>
         </div>
         <div class="header-line">
           <span class="glyph">${r ? sealGlyph(status) : '…'}</span>
@@ -429,15 +522,21 @@ function renderCompact(host, shadow, pos) {
         </div>
         ${
           r
-            ? `<div class="rows">${row('ORG', escapeHtml(r.org || '—'))}${row('ISSUER', escapeHtml(r.issuerOrg || '—'))}</div>`
-            : `<div class="checking">Checking…</div>`
+            ? `<div class="rows">${row(t('label_org_short'), escapeHtml(r.org || '—'))}${row(t('label_issuer_short'), escapeHtml(r.issuerOrg || '—'))}</div>`
+            : `<div class="checking">${escapeHtml(t('checking_compact'))}</div>`
         }
       </div>
     </div>
   `;
 
-  shadow.getElementById('expand-btn').addEventListener('click', () => setCompact(false));
-  shadow.getElementById('close-btn').addEventListener('click', turnOff);
+  const expandBtn = shadow.getElementById('expand-btn');
+  expandBtn.title = t('title_expand');
+  expandBtn.setAttribute('aria-label', t('title_expand'));
+  expandBtn.addEventListener('click', () => setCompact(false));
+  const closeBtn = shadow.getElementById('close-btn');
+  closeBtn.title = t('title_float_view_hide');
+  closeBtn.setAttribute('aria-label', t('title_float_view_hide'));
+  closeBtn.addEventListener('click', turnOff);
   attachFlagFallbacks(shadow);
 
   attachDrag(host, shadow.getElementById('drag-handle'), pos);
@@ -483,10 +582,13 @@ function renderFull(host, shadow, pos) {
       .rows { padding: 2px 14px; }
       .row { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px solid #262c36; }
       .row:last-child { border-bottom: none; }
-      .label { flex: none; width: 74px; color: #8b949e; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+      .label { flex: none; width: 74px; color: #8b949e; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .value { flex: 1; min-width: 0; overflow-wrap: break-word; font-size: 12px; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
       .value a { color: #58a6ff; }
       .value a:hover { text-decoration: none; }
+      .ext-icon-link { display: inline-flex; vertical-align: -2px; margin-left: 5px; opacity: 0.75; }
+      .ext-icon-link:hover { opacity: 1; }
+      .ext-icon { height: 13px; width: auto; max-width: 18px; border-radius: 1px; }
       .flag { height: auto; width: 24px; vertical-align: -3px; margin-right: 6px; }
       #issues { padding: 4px 14px; }
       .issue { padding: 6px 8px; margin-bottom: 6px; border-left: 3px solid #8b949e; background: #161b22; border-radius: 0 4px 4px 0; font-size: 12px; }
@@ -505,21 +607,21 @@ function renderFull(host, shadow, pos) {
         <div class="seal" data-status="${status}">${r ? sealGlyph(status) : '…'}</div>
         <div class="titles">
           <div class="hostname">${escapeHtml(currentHostname)}</div>
-          <div class="verdict ${status}">${r ? escapeHtml(verdictText(r, status)) : 'Checking…'}</div>
+          <div class="verdict ${status}">${r ? escapeHtml(verdictText(r, status)) : escapeHtml(t('checking_compact'))}</div>
         </div>
-        <button class="iconbtn" id="compact-btn" title="Compact view" aria-label="Compact view">
+        <button class="iconbtn" id="compact-btn">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="M14 10l7-7"/><path d="M3 21l7-7"/></svg>
         </button>
-        <button class="iconbtn close" id="close-btn" title="Turn off floating view" aria-label="Turn off floating view">✕</button>
+        <button class="iconbtn close" id="close-btn">✕</button>
       </div>
       <div class="body">
       ${
         !r
-          ? `<div class="checking">Waiting for the certificate check to finish…</div>`
+          ? `<div class="checking">${escapeHtml(t('checking_full'))}</div>`
           : `
       ${
         r.org || r.protocol
-          ? `<div class="rows">${row('Organization', escapeHtml(r.org || '—'))}${row('Issuer', escapeHtml(r.issuerOrg || '—'))}</div>`
+          ? `<div class="rows">${row(t('label_organization'), escapeHtml(r.org || '—'))}${row(t('label_issuer'), escapeHtml(r.issuerOrg || '—'))}</div>`
           : ''
       }
       <div id="issues">${(r.issues || [])
@@ -531,15 +633,15 @@ function renderFull(host, shadow, pos) {
       ${
         r.protocol || r.chainLength
           ? `<details>
-              <summary>SSL</summary>
+              <summary>${escapeHtml(t('section_ssl'))}</summary>
               <div class="rows">
-                ${row('Protocol', escapeHtml(`${r.protocol || '—'} ${r.cipherSuite || ''}`.trim()))}
-                ${row('Created', fmtCreated(r.notBefore))}
-                ${row('Expires', fmtExpires(r.notAfter))}
-                ${row('Chain', escapeHtml(fmtChain(r)))}
-                ${row('OCSP Stapled', r.ocspStapled ? 'Yes' : 'No')}
-                ${r.handshakeMs ? row('Handshake', `${r.handshakeMs} ms`) : ''}
-                ${r.dnsNames && r.dnsNames.length ? row('Covers', escapeHtml(r.dnsNames.join(', '))) : ''}
+                ${row(t('label_protocol'), escapeHtml(`${r.protocol || '—'} ${r.cipherSuite || ''}`.trim()))}
+                ${row(t('label_created'), fmtCreated(r.notBefore))}
+                ${row(t('label_expires'), fmtExpires(r.notAfter))}
+                ${row(t('label_chain'), escapeHtml(fmtChain(r)))}
+                ${row(t('label_ocsp_stapled'), r.ocspStapled ? t('value_yes') : t('value_no'))}
+                ${r.handshakeMs ? row(t('label_handshake'), `${r.handshakeMs} ms`) : ''}
+                ${r.dnsNames && r.dnsNames.length ? row(t('label_covers'), escapeHtml(r.dnsNames.join(', '))) : ''}
               </div>
             </details>`
           : ''
@@ -547,12 +649,12 @@ function renderFull(host, shadow, pos) {
       ${
         r.protocol || r.chainLength || r.geoCountry || r.geoAsn || r.geoAsName || r.resolvedIP
           ? `<details>
-              <summary>Hosting</summary>
+              <summary>${escapeHtml(t('section_hosting'))}</summary>
               <div class="rows">
-                ${r.protocol || r.chainLength ? row('Server', escapeHtml(r.server || 'Not disclosed')) : ''}
-                ${r.poweredBy ? row('Powered By', escapeHtml(r.poweredBy)) : ''}
-                ${r.protocol || r.chainLength ? row('HTTP/2', r.http2 ? 'Yes' : 'No') : ''}
-                ${r.resolvedIP ? row('IP Address', escapeHtml(r.resolvedIP)) : ''}
+                ${r.protocol || r.chainLength ? row(t('label_server'), escapeHtml(r.server || t('value_not_disclosed'))) : ''}
+                ${r.poweredBy ? row(t('label_powered_by'), escapeHtml(r.poweredBy)) : ''}
+                ${r.protocol || r.chainLength ? row(t('label_http2'), r.http2 ? t('value_yes') : t('value_no')) : ''}
+                ${ipRow(r)}
                 ${locationRow(r)}
                 ${networkRow(r)}
               </div>
@@ -562,13 +664,13 @@ function renderFull(host, shadow, pos) {
       ${
         r.registrarName || r.domainCreated
           ? `<details>
-              <summary>Domain</summary>
+              <summary>${escapeHtml(t('section_domain'))}</summary>
               <div class="rows">
-                ${r.registrarName ? row('Registrar', escapeHtml(r.registrarName)) : ''}
-                ${r.domainCreated ? row('Created', fmtCreated(r.domainCreated)) : ''}
-                ${r.domainExpires ? row('Expires', fmtExpires(r.domainExpires)) : ''}
-                ${r.dnsProviders && r.dnsProviders.length ? row('DNS Provider', escapeHtml(r.dnsProviders.join(', '))) : ''}
-                ${r.ownerOrg ? row('Owner', escapeHtml(r.ownerOrg)) : ''}
+                ${r.registrarName ? row(t('label_registrar'), escapeHtml(r.registrarName)) : ''}
+                ${r.domainCreated ? row(t('label_created'), fmtCreated(r.domainCreated)) : ''}
+                ${r.domainExpires ? row(t('label_expires'), fmtExpires(r.domainExpires)) : ''}
+                ${r.dnsProviders && r.dnsProviders.length ? row(t('label_dns_provider'), escapeHtml(r.dnsProviders.join(', '))) : ''}
+                ${r.ownerOrg ? row(t('label_owner'), escapeHtml(r.ownerOrg)) : ''}
               </div>
             </details>`
           : ''
@@ -578,8 +680,14 @@ function renderFull(host, shadow, pos) {
     </div>
   `;
 
-  shadow.getElementById('compact-btn').addEventListener('click', () => setCompact(true));
-  shadow.getElementById('close-btn').addEventListener('click', turnOff);
+  const compactBtn = shadow.getElementById('compact-btn');
+  compactBtn.title = t('title_compact_view');
+  compactBtn.setAttribute('aria-label', t('title_compact_view'));
+  compactBtn.addEventListener('click', () => setCompact(true));
+  const closeBtnFull = shadow.getElementById('close-btn');
+  closeBtnFull.title = t('title_float_view_hide');
+  closeBtnFull.setAttribute('aria-label', t('title_float_view_hide'));
+  closeBtnFull.addEventListener('click', turnOff);
   attachFlagFallbacks(shadow);
 
   attachDrag(host, shadow.getElementById('drag-handle'), pos);
@@ -609,21 +717,24 @@ function requestResult() {
 }
 
 if (extensionAlive()) {
-  chrome.storage.local.get(['floatViewEnabled', 'floatViewCompact', 'floatViewPos']).then((stored) => {
-    floatViewEnabled = !!stored.floatViewEnabled;
-    compactMode = !!stored.floatViewCompact;
-    // Restore the last dragged position (persisted across sessions). renderPanel clamps it
-    // to the current viewport, so a spot saved on a large screen stays reachable on a
-    // smaller one.
-    const p = stored.floatViewPos;
-    if (p && typeof p.left === 'number' && typeof p.top === 'number') {
-      window.__sslCheckerFloatPos = p;
-    }
-    if (floatViewEnabled) {
-      renderPanel(); // shows the "Checking…" placeholder immediately
-      requestResult();
-    }
-  });
+  chrome.storage.local
+    .get(['floatViewEnabled', 'floatViewCompact', 'floatViewPos', 'uiMessagesOverride'])
+    .then((stored) => {
+      floatViewEnabled = !!stored.floatViewEnabled;
+      compactMode = !!stored.floatViewCompact;
+      overrideMessages = stored.uiMessagesOverride || null;
+      // Restore the last dragged position (persisted across sessions). renderPanel clamps it
+      // to the current viewport, so a spot saved on a large screen stays reachable on a
+      // smaller one.
+      const p = stored.floatViewPos;
+      if (p && typeof p.left === 'number' && typeof p.top === 'number') {
+        window.__sslCheckerFloatPos = p;
+      }
+      if (floatViewEnabled) {
+        renderPanel(); // shows the "Checking…" placeholder immediately
+        requestResult();
+      }
+    });
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -643,6 +754,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
     // A drag in one tab repositions the panel in every tab, so it's already in the
     // remembered spot when the user switches over.
     window.__sslCheckerFloatPos = changes.floatViewPos.newValue;
+    needsRender = true;
+  }
+  if (changes.uiMessagesOverride) {
+    // The popup's language switcher wrote a new (or cleared the) override — redraw the
+    // panel in the newly-chosen language without needing a fresh result from the backend.
+    overrideMessages = changes.uiMessagesOverride.newValue || null;
     needsRender = true;
   }
 

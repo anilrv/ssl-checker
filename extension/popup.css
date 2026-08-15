@@ -143,6 +143,7 @@ code,
   color: var(--info);
 }
 
+#lang-switch,
 #rescan,
 #float-view {
   flex: none;
@@ -158,21 +159,88 @@ code,
   justify-content: center;
 }
 
+#lang-switch:hover,
 #rescan:hover,
 #float-view:hover {
   color: var(--accent);
   border-color: var(--accent);
 }
 
+#lang-switch:focus,
 #rescan:focus,
 #float-view:focus {
   outline: none;
 }
 
+#lang-switch:focus-visible,
 #rescan:focus-visible,
 #float-view:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+#lang-switch[aria-expanded="true"] {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+#lang-wrap {
+  position: relative;
+  flex: none;
+}
+
+#lang-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 150px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 10;
+}
+
+.lang-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lang-option:hover {
+  background: var(--ink);
+}
+
+.lang-option:focus {
+  outline: none;
+}
+
+.lang-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.lang-option .check {
+  flex: none;
+  width: 14px;
+  color: var(--accent);
+  visibility: hidden;
+}
+
+.lang-option.active .check {
+  visibility: visible;
 }
 
 #float-view.active {
@@ -228,6 +296,12 @@ code,
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding-top: 1px;
+  /* Non-English labels can run noticeably longer than English ones (e.g. German "Powered
+     By" -> "Bereitgestellt von") -- truncate rather than let a long label overflow into the
+     value column. row() sets a title= with the untruncated text. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .row .value {
@@ -243,6 +317,24 @@ code,
 
 .row .value a:hover {
   text-decoration: none;
+}
+
+.ext-icon-link {
+  display: inline-flex;
+  vertical-align: -2px;
+  margin-left: 5px;
+  opacity: 0.75;
+}
+
+.ext-icon-link:hover {
+  opacity: 1;
+}
+
+.ext-icon {
+  height: 13px;
+  width: auto;
+  max-width: 18px;
+  border-radius: 1px;
 }
 
 .muted-suffix {

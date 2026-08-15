@@ -1,0 +1,105 @@
+{
+  "extDescription": { "message": "現在アクセスしているサイトのSSL/TLS証明書の発行組織を表示し、証明書に関する問題を検出します。" },
+
+  "label_organization": { "message": "組織" },
+  "label_org_short": { "message": "組織" },
+  "label_issuer_short": { "message": "発行者" },
+  "label_issuer": { "message": "発行者" },
+  "label_protocol": { "message": "プロトコル" },
+  "label_created": { "message": "作成日" },
+  "label_expires": { "message": "有効期限" },
+  "label_chain": { "message": "チェーン" },
+  "label_ocsp_stapled": { "message": "OCSPステープリング" },
+  "label_handshake": { "message": "ハンドシェイク" },
+  "label_covers": { "message": "対象ドメイン" },
+  "label_server": { "message": "サーバー" },
+  "label_powered_by": { "message": "使用技術" },
+  "label_http2": { "message": "HTTP/2" },
+  "label_ip_address": { "message": "IPアドレス" },
+  "label_location": { "message": "所在地" },
+  "label_network": { "message": "ネットワーク" },
+  "label_registrar": { "message": "レジストラ" },
+  "label_dns_provider": { "message": "DNSプロバイダー" },
+  "label_owner": { "message": "所有者" },
+
+  "value_yes": { "message": "はい" },
+  "value_no": { "message": "いいえ" },
+  "value_not_disclosed": { "message": "非公開" },
+
+  "section_ssl": { "message": "SSL" },
+  "section_hosting": { "message": "ホスティング" },
+  "section_domain": { "message": "ドメイン" },
+
+  "verdict_no_scan_data": { "message": "このタブのスキャンデータはまだありません。" },
+  "verdict_could_not_fully_check": { "message": "このサイトを完全に確認できませんでした" },
+  "verdict_no_issues": { "message": "問題は見つかりませんでした" },
+  "verdict_issue_singular": { "message": "1件の問題が見つかりました" },
+  "verdict_issues_plural": {
+    "message": "$COUNT$件の問題が見つかりました",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "checking_full": { "message": "証明書の確認が完了するのを待っています…" },
+  "checking_compact": { "message": "確認中…" },
+
+  "chain_trusted": { "message": "信頼済み" },
+  "chain_untrusted_root": { "message": "信頼されていないルート" },
+  "chain_incomplete": { "message": "不完全" },
+  "chain_certs_singular": {
+    "message": "証明書$COUNT$件",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "chain_certs_plural": {
+    "message": "証明書$COUNT$件",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+
+  "title_rescan": { "message": "再スキャン" },
+  "title_float_view_show": { "message": "ページにフローティング表示を出す" },
+  "title_float_view_hide": { "message": "フローティング表示をオフにする" },
+  "title_float_view_unavailable": { "message": "このページではフローティング表示を利用できません" },
+  "title_expand": { "message": "展開" },
+  "title_compact_view": { "message": "コンパクト表示" },
+  "title_ipinfo_link": { "message": "ipinfo.ioで見る" },
+  "title_cloudflare_radar_link": { "message": "Cloudflare Radarで見る" },
+  "title_language_switch": { "message": "言語を変更" },
+
+  "error_function_key_rejected": { "message": "バックエンドにファンクションキーが拒否されました。" },
+  "error_could_not_reach_service": {
+    "message": "確認サービスに接続できませんでした: $DETAIL$",
+    "placeholders": { "detail": { "content": "$1" } }
+  },
+  "error_check_failed": {
+    "message": "確認に失敗しました(HTTP $STATUS$)",
+    "placeholders": { "status": { "content": "$1" } }
+  },
+
+  "error_code_invalid_host": { "message": "ホスト名が無効か指定されていません" },
+  "error_code_rate_limited": { "message": "リクエスト数の上限に達しました。しばらくしてから再度お試しください" },
+  "error_code_server_not_configured": { "message": "確認サービスは一時的に利用できません" },
+
+  "tooltip_no_https_suffix": { "message": "— HTTPSではありません" },
+  "tooltip_ssl_prefix": {
+    "message": "SSL: $ISSUER$",
+    "placeholders": { "issuer": { "content": "$1" } }
+  },
+
+  "issue_no_https": { "message": "HTTPSではありません — 通信が暗号化されていません" },
+  "issue_expired": { "message": "証明書の有効期限が切れています" },
+  "issue_not_yet_valid": { "message": "証明書はまだ有効ではありません" },
+  "issue_self_signed": { "message": "証明書は自己署名されているようです" },
+  "issue_incomplete_chain": { "message": "サーバーに中間証明書が設定されていません" },
+  "issue_untrusted_chain": { "message": "証明書チェーンが信頼されたルート認証局につながっていません" },
+  "issue_hostname_mismatch": { "message": "証明書がこのサイトのホスト名に対応していません" },
+  "issue_weak_protocol": { "message": "サーバーが古いTLSプロトコル(TLS 1.0)をまだ許可しています" },
+  "issue_revoked": { "message": "証明書は発行者によって失効されています" },
+  "issue_weak_signature": { "message": "証明書が弱い署名アルゴリズムで署名されています(SHA-1/MD5)" },
+  "issue_weak_key": { "message": "証明書が弱いRSA鍵を使用しています(2048ビット未満)" },
+  "issue_recently_registered": { "message": "ドメインは10日以内に登録されたばかりです" },
+  "issue_young_domain": { "message": "ドメインは30日以内に登録されたばかりです" },
+  "issue_cert_expiring_soon": { "message": "証明書は14日以内に期限切れになります" },
+  "issue_domain_expiring_soon": { "message": "ドメインの登録は14日以内に期限切れになります" },
+  "issue_resolve_failed": { "message": "このホスト名を解決できませんでした" },
+  "issue_probe_failed": { "message": "証明書を確認するために接続できませんでした" },
+
+  "language_auto": { "message": "自動(ブラウザに合わせる)" }
+}

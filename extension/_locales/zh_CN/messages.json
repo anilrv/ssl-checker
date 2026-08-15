@@ -1,0 +1,105 @@
+{
+  "extDescription": { "message": "显示当前网站的 SSL/TLS 证书颁发机构信息，并标记证书相关问题。" },
+
+  "language_auto": { "message": "自动（跟随浏览器）" },
+
+  "label_organization": { "message": "组织" },
+  "label_org_short": { "message": "组织" },
+  "label_issuer_short": { "message": "颁发者" },
+  "label_issuer": { "message": "颁发者" },
+  "label_protocol": { "message": "协议" },
+  "label_created": { "message": "创建时间" },
+  "label_expires": { "message": "过期时间" },
+  "label_chain": { "message": "证书链" },
+  "label_ocsp_stapled": { "message": "OCSP 装订" },
+  "label_handshake": { "message": "握手耗时" },
+  "label_covers": { "message": "覆盖域名" },
+  "label_server": { "message": "服务器" },
+  "label_powered_by": { "message": "技术支持" },
+  "label_http2": { "message": "HTTP/2" },
+  "label_ip_address": { "message": "IP 地址" },
+  "label_location": { "message": "地理位置" },
+  "label_network": { "message": "网络" },
+  "label_registrar": { "message": "注册商" },
+  "label_dns_provider": { "message": "DNS 提供商" },
+  "label_owner": { "message": "所有者" },
+
+  "value_yes": { "message": "是" },
+  "value_no": { "message": "否" },
+  "value_not_disclosed": { "message": "未公开" },
+
+  "section_ssl": { "message": "SSL" },
+  "section_hosting": { "message": "托管信息" },
+  "section_domain": { "message": "域名信息" },
+
+  "verdict_no_scan_data": { "message": "此标签页尚无扫描数据。" },
+  "verdict_could_not_fully_check": { "message": "无法完整检查此网站" },
+  "verdict_no_issues": { "message": "未发现问题" },
+  "verdict_issue_singular": { "message": "发现 1 个问题" },
+  "verdict_issues_plural": {
+    "message": "发现 $COUNT$ 个问题",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "checking_full": { "message": "正在等待证书检查完成…" },
+  "checking_compact": { "message": "检查中…" },
+
+  "chain_trusted": { "message": "受信任" },
+  "chain_untrusted_root": { "message": "根证书不受信任" },
+  "chain_incomplete": { "message": "证书链不完整" },
+  "chain_certs_singular": {
+    "message": "$COUNT$ 个证书",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "chain_certs_plural": {
+    "message": "$COUNT$ 个证书",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+
+  "title_rescan": { "message": "重新扫描" },
+  "title_float_view_show": { "message": "在页面上显示悬浮窗" },
+  "title_float_view_hide": { "message": "关闭悬浮窗" },
+  "title_float_view_unavailable": { "message": "此页面不支持悬浮窗" },
+  "title_expand": { "message": "展开" },
+  "title_compact_view": { "message": "紧凑视图" },
+  "title_ipinfo_link": { "message": "在 ipinfo.io 上查看" },
+  "title_cloudflare_radar_link": { "message": "在 Cloudflare Radar 上查看" },
+  "title_language_switch": { "message": "更改语言" },
+
+  "error_function_key_rejected": { "message": "后端拒绝了此功能密钥。" },
+  "error_could_not_reach_service": {
+    "message": "无法连接检查服务：$DETAIL$",
+    "placeholders": { "detail": { "content": "$1" } }
+  },
+  "error_check_failed": {
+    "message": "检查失败（HTTP $STATUS$）",
+    "placeholders": { "status": { "content": "$1" } }
+  },
+
+  "error_code_invalid_host": { "message": "主机名无效或缺失" },
+  "error_code_rate_limited": { "message": "请求过于频繁，请稍后重试" },
+  "error_code_server_not_configured": { "message": "检查服务暂时不可用" },
+
+  "tooltip_no_https_suffix": { "message": "— 未使用 HTTPS" },
+  "tooltip_ssl_prefix": {
+    "message": "SSL：$ISSUER$",
+    "placeholders": { "issuer": { "content": "$1" } }
+  },
+
+  "issue_no_https": { "message": "未使用 HTTPS — 连接未加密" },
+  "issue_expired": { "message": "证书已过期" },
+  "issue_not_yet_valid": { "message": "证书尚未生效" },
+  "issue_self_signed": { "message": "证书疑似为自签名证书" },
+  "issue_incomplete_chain": { "message": "服务器缺少中间证书" },
+  "issue_untrusted_chain": { "message": "证书链未指向受信任的根证书颁发机构" },
+  "issue_hostname_mismatch": { "message": "证书未覆盖此网站的主机名" },
+  "issue_weak_protocol": { "message": "服务器仍接受过时的 TLS 协议（TLS 1.0）" },
+  "issue_revoked": { "message": "证书已被颁发者吊销" },
+  "issue_weak_signature": { "message": "证书使用弱签名算法签署（SHA-1/MD5）" },
+  "issue_weak_key": { "message": "证书使用弱 RSA 密钥（小于 2048 位）" },
+  "issue_recently_registered": { "message": "该域名注册时间不足 10 天" },
+  "issue_young_domain": { "message": "该域名注册时间不足 30 天" },
+  "issue_cert_expiring_soon": { "message": "证书将在 14 天内过期" },
+  "issue_domain_expiring_soon": { "message": "域名注册将在 14 天内到期" },
+  "issue_resolve_failed": { "message": "无法解析此主机名" },
+  "issue_probe_failed": { "message": "无法连接以检查证书" }
+}

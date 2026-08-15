@@ -1,0 +1,125 @@
+{
+  "extDescription": {
+    "message": "Показывает организацию SSL/TLS-сертификата текущего сайта и предупреждает о проблемах с сертификатом."
+  },
+
+  "label_organization": { "message": "Организация" },
+  "label_org_short": { "message": "ОРГ" },
+  "label_issuer_short": { "message": "ИЗД" },
+  "label_issuer": { "message": "Издатель" },
+  "label_protocol": { "message": "Протокол" },
+  "label_created": { "message": "Создан" },
+  "label_expires": { "message": "Истекает" },
+  "label_chain": { "message": "Цепочка" },
+  "label_ocsp_stapled": { "message": "OCSP Stapling" },
+  "label_handshake": { "message": "Рукопожатие" },
+  "label_covers": { "message": "Домены" },
+  "label_server": { "message": "Сервер" },
+  "label_powered_by": { "message": "Работает на" },
+  "label_http2": { "message": "HTTP/2" },
+  "label_ip_address": { "message": "IP-адрес" },
+  "label_location": { "message": "Расположение" },
+  "label_network": { "message": "Сеть" },
+  "label_registrar": { "message": "Регистратор" },
+  "label_dns_provider": { "message": "DNS-провайдер" },
+  "label_owner": { "message": "Владелец" },
+
+  "value_yes": { "message": "Да" },
+  "value_no": { "message": "Нет" },
+  "value_not_disclosed": { "message": "Не указано" },
+
+  "section_ssl": { "message": "SSL" },
+  "section_hosting": { "message": "Хостинг" },
+  "section_domain": { "message": "Домен" },
+
+  "verdict_no_scan_data": {
+    "message": "Для этой вкладки пока нет данных проверки."
+  },
+  "verdict_could_not_fully_check": {
+    "message": "Не удалось полностью проверить этот сайт"
+  },
+  "verdict_no_issues": { "message": "Проблем не обнаружено" },
+  "verdict_issue_singular": { "message": "Обнаружена 1 проблема" },
+  "verdict_issues_plural": {
+    "message": "Обнаружено проблем: $COUNT$",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "checking_full": {
+    "message": "Ожидание завершения проверки сертификата…"
+  },
+  "checking_compact": {
+    "message": "Проверка…"
+  },
+
+  "chain_trusted": { "message": "доверенная" },
+  "chain_untrusted_root": { "message": "недоверенный корень" },
+  "chain_incomplete": { "message": "неполная" },
+  "chain_certs_singular": {
+    "message": "$COUNT$ сертификат",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "chain_certs_plural": {
+    "message": "$COUNT$ сертификата",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+
+  "title_rescan": { "message": "Повторить проверку" },
+  "title_float_view_show": { "message": "Показать плавающую панель на странице" },
+  "title_float_view_hide": { "message": "Отключить плавающую панель" },
+  "title_float_view_unavailable": { "message": "Плавающая панель недоступна на этой странице" },
+  "title_expand": { "message": "Развернуть" },
+  "title_compact_view": { "message": "Компактный вид" },
+  "title_ipinfo_link": { "message": "Просмотреть на ipinfo.io" },
+  "title_cloudflare_radar_link": { "message": "Просмотреть в Cloudflare Radar" },
+
+  "error_function_key_rejected": {
+    "message": "Ключ функции отклонён сервером."
+  },
+  "error_could_not_reach_service": {
+    "message": "Не удалось подключиться к сервису проверки: $DETAIL$",
+    "placeholders": { "detail": { "content": "$1" } }
+  },
+  "error_check_failed": {
+    "message": "Проверка не удалась (HTTP $STATUS$)",
+    "placeholders": { "status": { "content": "$1" } }
+  },
+
+  "error_code_invalid_host": {
+    "message": "Недопустимое или отсутствующее имя хоста"
+  },
+  "error_code_rate_limited": {
+    "message": "Превышен лимит запросов, повторите попытку позже"
+  },
+  "error_code_server_not_configured": {
+    "message": "Сервис проверки временно недоступен"
+  },
+
+  "tooltip_no_https_suffix": {
+    "message": "— нет HTTPS"
+  },
+  "tooltip_ssl_prefix": {
+    "message": "SSL: $ISSUER$",
+    "placeholders": { "issuer": { "content": "$1" } }
+  },
+
+  "issue_no_https": { "message": "Нет HTTPS — соединение не зашифровано" },
+  "issue_expired": { "message": "Срок действия сертификата истёк" },
+  "issue_not_yet_valid": { "message": "Сертификат ещё не действителен" },
+  "issue_self_signed": { "message": "Сертификат похож на самоподписанный" },
+  "issue_incomplete_chain": { "message": "На сервере отсутствует промежуточный сертификат" },
+  "issue_untrusted_chain": { "message": "Цепочка не ведёт к доверенному корневому центру сертификации" },
+  "issue_hostname_mismatch": { "message": "Сертификат не покрывает имя хоста этого сайта" },
+  "issue_weak_protocol": { "message": "Сервер всё ещё поддерживает устаревший протокол TLS (TLS 1.0)" },
+  "issue_revoked": { "message": "Сертификат отозван издателем" },
+  "issue_weak_signature": { "message": "Сертификат подписан слабым алгоритмом (SHA-1/MD5)" },
+  "issue_weak_key": { "message": "Сертификат использует слабый ключ RSA (менее 2048 бит)" },
+  "issue_recently_registered": { "message": "Домен зарегистрирован менее 10 дней назад" },
+  "issue_young_domain": { "message": "Домен зарегистрирован менее 30 дней назад" },
+  "issue_cert_expiring_soon": { "message": "Срок действия сертификата истекает в течение 14 дней" },
+  "issue_domain_expiring_soon": { "message": "Регистрация домена истекает в течение 14 дней" },
+  "issue_resolve_failed": { "message": "Не удалось разрешить имя хоста" },
+  "issue_probe_failed": { "message": "Не удалось подключиться для проверки сертификата" },
+
+  "language_auto": { "message": "Авто (как в браузере)" },
+  "title_language_switch": { "message": "Изменить язык" }
+}
