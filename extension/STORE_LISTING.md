@@ -14,9 +14,9 @@ Check the current site's TLS certificate — organization, issuer, validity, and
 
 SSL Issue Checker inspects the TLS/SSL certificate of the site in your active tab — with a live, real TLS handshake, not a cached third-party lookup — and shows you everything that matters at a glance.
 
-WHAT'S NEW IN 2.1.1
+WHAT'S NEW IN 2.3.0
 
-• The Hosting section now shows the site's resolved server IP address (IPv4 or IPv6), alongside its location and network operator.
+• The extension UI is now available in 8 languages: English, German, Simplified Chinese, Turkish, Japanese, Russian, French, and Brazilian Portuguese. Pick one from the new language switcher (globe icon) in the popup header, independent of your browser's own language.
 
 WHAT IT SHOWS
 
@@ -29,10 +29,10 @@ SSL / Certificate
 • OCSP stapling, TLS handshake time, and the hostnames the certificate covers
 
 Hosting
-• Resolved server IP address (IPv4 or IPv6)
+• Resolved server IP address (IPv4 or IPv6), linked to its ipinfo.io lookup
 • Server software (Server / X-Powered-By headers) and HTTP/2 support
 • Approximate server location (city and country, with a flag)
-• Network operator (ASN), linked to Cloudflare Radar
+• Network operator (ASN), linked to both ipinfo.io and Cloudflare Radar
 
 Domain
 • Registrar and domain registration/expiry dates
@@ -46,6 +46,10 @@ TWO WAYS TO VIEW
 
 • Toolbar popup — click the icon for the full breakdown, with a re-scan button.
 • Optional floating panel — a small draggable card rendered on the page itself that follows you across normal browsing until you turn it off. It has a full mode and a compact mode (status, location flag, org and issuer at a glance), and it remembers where you placed it.
+
+AVAILABLE IN 8 LANGUAGES
+
+English, German, Simplified Chinese, Turkish, Japanese, Russian, French, and Brazilian Portuguese — switch languages from the globe icon in the popup header, independent of your browser's own display language.
 
 ZERO SETUP, MINIMAL DATA
 
