@@ -1,0 +1,118 @@
+{
+    "rdapConformance": [
+        "rdap_level_0"
+    ],
+    "notices": [
+        {
+            "title": "Acceptable Use Policy (AUP)",
+            "description": [
+                "This information is subject to an Acceptable Use Policy."
+            ],
+            "links": [
+                {
+                    "rel": "alternate",
+                    "type": "text/html",
+                    "href": "https://www.nic.ch/terms/aup/"
+                }
+            ]
+        }
+    ],
+    "objectClassName": "domain",
+    "ldhName": "vaduz.li",
+    "switch_name": "vaduz.li",
+    "handle": "vaduz.li",
+    "entities": [
+        {
+            "objectClassName": "entity",
+            "roles": [
+                "registrar"
+            ],
+            "vcardArray": [
+                "vcard",
+                [
+                    [
+                        "version",
+                        {
+                        },
+                        "text",
+                        "4.0"
+                    ],
+                    [
+                        "org",
+                        {
+                        },
+                        "text",
+                        "Swizzonic AG"
+                    ],
+                    [
+                        "adr",
+                        {
+                        },
+                        "text",
+                        [
+                            "",
+                            "",
+                            "Badenerstrasse 47",
+                            "Zürich",
+                            "",
+                            "8004",
+                            "CH"
+                        ]
+                    ],
+                    [
+                        "kind",
+                        {
+                        },
+                        "text",
+                        "group"
+                    ]
+                ]
+            ],
+            "url": "https://www.swizzonic.ch/company/kontaktiere-uns/"
+        }
+    ],
+    "status": [
+        "active"
+    ],
+    "events": [
+        {
+            "eventAction": "registration",
+            "eventDate": "1997-06-24"
+        }
+    ],
+    "secureDNS": {
+        "delegationSigned": false
+    },
+    "nameservers": [
+        {
+            "ldhName": "pdns1.llv.li",
+            "objectClassName": "nameserver",
+            "ipAddresses": {
+                "v4": [
+                    "193.222.114.66"
+                ]
+            }
+        },
+        {
+            "ldhName": "pdns.llv.li",
+            "objectClassName": "nameserver",
+            "ipAddresses": {
+                "v4": [
+                    "193.222.114.65"
+                ]
+            }
+        },
+        {
+            "ldhName": "scsnms.switch.ch",
+            "objectClassName": "nameserver",
+            "ipAddresses": {
+                "v4": [
+                    "130.59.31.26"
+                ],
+                "v6": [
+                    "2001:620:0:ff::a7"
+                ]
+            }
+        }
+    ]
+}

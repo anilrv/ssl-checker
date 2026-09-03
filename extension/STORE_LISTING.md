@@ -14,9 +14,10 @@ Check the current site's TLS certificate — organization, issuer, validity, and
 
 SSL Issue Checker inspects the TLS/SSL certificate of the site in your active tab — with a live, real TLS handshake, not a cached third-party lookup — and shows you everything that matters at a glance.
 
-WHAT'S NEW IN 2.3.0
+WHAT'S NEW IN 2.4.0
 
-• The extension UI is now available in 8 languages: English, German, Simplified Chinese, Turkish, Japanese, Russian, French, and Brazilian Portuguese. Pick one from the new language switcher (globe icon) in the popup header, independent of your browser's own language.
+• New checks for missing security headers — Strict-Transport-Security (HSTS), Content-Security-Policy (CSP), and X-Frame-Options — flagged as low-severity hardening notices, translated in all 8 supported languages.
+• Domain registration lookups now query the domain's own registry directly over the public RDAP/WHOIS protocol instead of a third-party API — same data shown, more resilient, and reflected in an updated privacy policy.
 
 WHAT IT SHOWS
 
@@ -40,7 +41,7 @@ Domain
 
 ISSUES, CALLED OUT CLEARLY
 
-Expired or not-yet-valid certificates, self-signed certificates, hostname mismatches, incomplete certificate chains, untrusted roots, revoked certificates, weak cryptography (SHA-1/MD5 signatures, RSA keys under 2048 bits), outdated TLS 1.0 support, and missing HTTPS. Domain-age warnings catch a common phishing pattern: a site whose domain was registered less than 10 days ago is flagged red, and less than 30 days ago yellow. You also get an early heads-up when the certificate — or the domain registration itself — is within 14 days of expiring. Every issue carries a severity level, summarized as a coloured badge on the toolbar icon.
+Expired or not-yet-valid certificates, self-signed certificates, hostname mismatches, incomplete certificate chains, untrusted roots, revoked certificates, weak cryptography (SHA-1/MD5 signatures, RSA keys under 2048 bits), outdated TLS 1.0 support, and missing HTTPS. Domain-age warnings catch a common phishing pattern: a site whose domain was registered less than 10 days ago is flagged red, and less than 30 days ago yellow. You also get an early heads-up when the certificate — or the domain registration itself — is within 14 days of expiring. Low-severity hardening notices flag when a site doesn't send a Strict-Transport-Security, Content-Security-Policy, or X-Frame-Options header. Every issue carries a severity level, summarized as a coloured badge on the toolbar icon.
 
 TWO WAYS TO VIEW
 

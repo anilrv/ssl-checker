@@ -5,29 +5,42 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
-	"net/http"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/azure/azure-functions-golang-worker/sdk"
+
+	"sslcheckerfunc/whois/internal/domain"
+	"sslcheckerfunc/whois/internal/model"
+	"sslcheckerfunc/whois/internal/srcerr"
 )
 
-type roundTripFunc func(*http.Request) (*http.Response, error)
+// fakeSource is a source that returns a canned result/error, letting tests exercise
+// Lookup's caching/mapping/fallback logic without a real RDAP or WHOIS network call. It
+// deliberately does not implement warmer, so swapping it in for rdapSource also disables
+// Lookup's bootstrap warm-up — no test here should ever reach the real IANA registry.
+type fakeSource struct {
+	result *model.Result
+	err    error
+}
 
-func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+func (f fakeSource) Lookup(ctx context.Context, n domain.Name) (*model.Result, error) {
+	return f.result, f.err
+}
+
+func withSources(t *testing.T, rdapFake, whoisFake source) {
+	t.Helper()
+	oldRDAP, oldWhois := rdapSource, whoisSource
+	rdapSource, whoisSource = rdapFake, whoisFake
+	t.Cleanup(func() { rdapSource, whoisSource = oldRDAP, oldWhois })
+}
 
 func TestLookupSkipsReservedAndIPLiteralHosts(t *testing.T) {
-	t.Setenv("WHOISJSON_TOKEN", "dummy-token")
-
-	oldTransport := httpClient.Transport
-	httpClient.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		t.Fatalf("unexpected outbound request to %s", r.URL)
-		return nil, nil
-	})
-	t.Cleanup(func() { httpClient.Transport = oldTransport })
+	withSources(t,
+		fakeSource{err: errors.New("unexpected: rdap should never be called")},
+		fakeSource{err: errors.New("unexpected: whois should never be called")},
+	)
 
 	for _, host := range []string{"printer.local", "server.internal", "a.b.c.local", "192.168.0.85", "8.8.8.8", "::1"} {
 		if info := Lookup(context.Background(), host); info != nil {
@@ -36,79 +49,75 @@ func TestLookupSkipsReservedAndIPLiteralHosts(t *testing.T) {
 	}
 }
 
-// dominosResponse is the real whoisjson.com payload for dominos.co.in, captured while
-// diagnosing why pizzaonline.dominos.co.in showed no domain-registration info. Its
-// "contacts" field is a bare [], not the usual {"owner": [...]} object.
-const dominosResponse = `{
-	"server": "Iota",
-	"name": "dominos.co.in",
-	"status": "clientTransferProhibited https://icann.org/epp#clientTransferProhibited",
-	"nameserver": ["NS-1807.AWSDNS-33.CO.UK"],
-	"created": "2005-03-03 06:53:08",
-	"changed": "2026-03-02 09:18:43",
-	"expires": "2031-03-03 06:53:08",
-	"registered": true,
-	"dnssec": "unsigned",
-	"whoisserver": "whois.101domain.com",
-	"contacts": [],
-	"registrar": {
-		"id": "1011",
-		"name": "https://www.101domain.com/",
-		"email": "abuse@101domain.com",
-		"url": "https://www.101domain.com/",
-		"phone": "+1.8582954626"
-	},
-	"network": null,
-	"exception": null,
-	"parsedContacts": false,
-	"source": "whois"
-}`
+func TestLookupMapsRDAPResultAndDetectsProvider(t *testing.T) {
+	created := time.Date(2007, 8, 22, 0, 0, 0, 0, time.UTC)
+	expires := time.Date(2028, 4, 30, 0, 0, 0, 0, time.UTC)
+	result := &model.Result{
+		Registrar: model.Registrar{Name: model.Str("NameWeb BVBA")},
+		Nameservers: []model.Nameserver{
+			{Name: "ns-1807.awsdns-33.co.uk"},
+			{Name: "ns-1807.awsdns-33.com"}, // same provider again — must not duplicate
+		},
+		Dates: model.Dates{Created: &created, Expires: &expires},
+		Contacts: model.Contacts{
+			Registrant: model.Contact{Organization: model.Str("NameWeb BV")},
+		},
+	}
+	withSources(t, fakeSource{result: result}, fakeSource{err: errors.New("unexpected: whois fallback should not run when rdap succeeds")})
 
-func TestLookupSurvivesArrayShapedContacts(t *testing.T) {
-	t.Setenv("WHOISJSON_TOKEN", "dummy-token")
-
-	oldTransport := httpClient.Transport
-	httpClient.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		return &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(dominosResponse)),
-			Header:     make(http.Header),
-		}, nil
-	})
-	t.Cleanup(func() { httpClient.Transport = oldTransport })
-
-	info := Lookup(context.Background(), "pizzaonline.dominos.co.in")
+	info := Lookup(context.Background(), "example-nameweb-test.com")
 	if info == nil {
-		t.Fatal("Lookup returned nil; a shape mismatch on one field should not discard the whole response")
+		t.Fatal("Lookup returned nil, want a populated Info")
 	}
-	if info.RegistrarName != "https://www.101domain.com/" {
-		t.Errorf("RegistrarName = %q, want the registrar URL", info.RegistrarName)
+	if info.RegistrarName != "NameWeb BVBA" {
+		t.Errorf("RegistrarName = %q, want %q", info.RegistrarName, "NameWeb BVBA")
 	}
-	wantCreated := time.Date(2005, 3, 3, 6, 53, 8, 0, time.UTC)
-	if !info.Created.Equal(wantCreated) {
-		t.Errorf("Created = %v, want %v", info.Created, wantCreated)
+	if info.OwnerOrg != "NameWeb BV" {
+		t.Errorf("OwnerOrg = %q, want %q", info.OwnerOrg, "NameWeb BV")
 	}
-	wantExpires := time.Date(2031, 3, 3, 6, 53, 8, 0, time.UTC)
-	if !info.Expires.Equal(wantExpires) {
-		t.Errorf("Expires = %v, want %v", info.Expires, wantExpires)
+	if !info.Created.Equal(created) {
+		t.Errorf("Created = %v, want %v", info.Created, created)
 	}
-	if info.OwnerOrg != "" {
-		t.Errorf("OwnerOrg = %q, want empty (contacts carried no owner data)", info.OwnerOrg)
+	if !info.Expires.Equal(expires) {
+		t.Errorf("Expires = %v, want %v", info.Expires, expires)
+	}
+	if want := []string{"aws-route53"}; len(info.DetectedProviders) != 1 || info.DetectedProviders[0] != want[0] {
+		t.Errorf("DetectedProviders = %v, want %v", info.DetectedProviders, want)
 	}
 }
 
-// TestLookupLogsOnRequestFailure verifies a genuine lookup failure (e.g. the 2s budget
-// expiring) actually reaches slog, not just that the code path compiles. Lookup rebinds
-// ctx to a timeout-scoped child before logging, so this also guards against that
-// rebinding accidentally losing the invocation attributes slog's sdk handler attaches.
-func TestLookupLogsOnRequestFailure(t *testing.T) {
-	t.Setenv("WHOISJSON_TOKEN", "dummy-token")
+func TestLookupFallsBackToWhoisWhenNoRDAPSource(t *testing.T) {
+	whoisResult := &model.Result{Registrar: model.Registrar{Name: model.Str("Registrar via WHOIS fallback")}}
+	withSources(t,
+		fakeSource{err: srcerr.ErrNoSource},
+		fakeSource{result: whoisResult},
+	)
 
-	oldTransport := httpClient.Transport
-	httpClient.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		return nil, errors.New("simulated network failure")
-	})
-	t.Cleanup(func() { httpClient.Transport = oldTransport })
+	info := Lookup(context.Background(), "example-fallback-test.com")
+	if info == nil {
+		t.Fatal("Lookup returned nil, want the WHOIS fallback's result")
+	}
+	if info.RegistrarName != "Registrar via WHOIS fallback" {
+		t.Errorf("RegistrarName = %q, want the WHOIS fallback's value", info.RegistrarName)
+	}
+}
+
+func TestLookupReturnsNilWithoutCachingOnEmptyResult(t *testing.T) {
+	withSources(t, fakeSource{result: &model.Result{}}, fakeSource{})
+
+	host := "example-empty-result-test.com"
+	if info := Lookup(context.Background(), host); info != nil {
+		t.Fatalf("Lookup = %+v, want nil for an all-empty result", info)
+	}
+	if _, ok := cache.Get(host); ok {
+		t.Error("an empty result must not be cached")
+	}
+}
+
+// TestLookupLogsOnFailure verifies a genuine lookup failure actually reaches slog, not
+// just that the code path compiles.
+func TestLookupLogsOnFailure(t *testing.T) {
+	withSources(t, fakeSource{err: errors.New("simulated registry failure")}, fakeSource{})
 
 	var buf bytes.Buffer
 	oldDefault := slog.Default()
@@ -116,7 +125,7 @@ func TestLookupLogsOnRequestFailure(t *testing.T) {
 	t.Cleanup(func() { slog.SetDefault(oldDefault) })
 
 	if info := Lookup(context.Background(), "logging-check-whois-test.com"); info != nil {
-		t.Fatalf("Lookup = %+v, want nil on request failure", info)
+		t.Fatalf("Lookup = %+v, want nil on lookup failure", info)
 	}
 
 	var record struct {
@@ -129,8 +138,39 @@ func TestLookupLogsOnRequestFailure(t *testing.T) {
 	if record.Level != slog.LevelError.String() {
 		t.Errorf("level = %q, want %q", record.Level, slog.LevelError.String())
 	}
-	if record.Msg != "whois: request failed" {
-		t.Errorf("msg = %q, want %q", record.Msg, "whois: request failed")
+	if record.Msg != "whois: lookup failed" {
+		t.Errorf("msg = %q, want %q", record.Msg, "whois: lookup failed")
+	}
+}
+
+func TestDetectProviders(t *testing.T) {
+	tests := []struct {
+		name string
+		ns   []string
+		want []string
+	}{
+		{"aws route53", []string{"ns-1807.awsdns-33.co.uk", "ns-200.awsdns-25.com"}, []string{"aws-route53"}},
+		{"cloudflare", []string{"lucy.ns.cloudflare.com", "sam.ns.cloudflare.com"}, []string{"cloudflare"}},
+		{"multiple distinct providers", []string{"dns1.registrar-servers.com", "ns1.digitalocean.com"}, []string{"namecheap", "digitalocean"}},
+		{"unknown nameserver", []string{"ns1.some-unheard-of-host.example"}, nil},
+		{"no nameservers", nil, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var nss []model.Nameserver
+			for _, n := range tt.ns {
+				nss = append(nss, model.Nameserver{Name: n})
+			}
+			got := detectProviders(nss)
+			if len(got) != len(tt.want) {
+				t.Fatalf("detectProviders(%v) = %v, want %v", tt.ns, got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("detectProviders(%v) = %v, want %v", tt.ns, got, tt.want)
+				}
+			}
+		})
 	}
 }
 

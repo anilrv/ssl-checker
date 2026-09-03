@@ -1,0 +1,118 @@
+{
+  "query": "vaduz.li",
+  "domain": "vaduz.li",
+  "domainUnicode": null,
+  "id": "vaduz.li",
+  "tld": "li",
+  "isRegistered": true,
+  "registrar": {
+    "name": "Swizzonic AG",
+    "ianaId": null,
+    "url": "https://www.swizzonic.ch/company/kontaktiere-uns/",
+    "whoisServer": null,
+    "abuseEmail": null,
+    "abusePhone": null,
+    "reseller": null
+  },
+  "status": [
+    "ok"
+  ],
+  "nameservers": [
+    {
+      "name": "pdns1.llv.li",
+      "ipv4": [
+        "193.222.114.66"
+      ],
+      "ipv6": []
+    },
+    {
+      "name": "pdns.llv.li",
+      "ipv4": [
+        "193.222.114.65"
+      ],
+      "ipv6": []
+    },
+    {
+      "name": "scsnms.switch.ch",
+      "ipv4": [
+        "130.59.31.26"
+      ],
+      "ipv6": [
+        "2001:620:0:ff::a7"
+      ]
+    }
+  ],
+  "dnssec": {
+    "signed": false,
+    "dsData": []
+  },
+  "dates": {
+    "created": "1997-06-24T00:00:00Z",
+    "updated": null,
+    "expires": null
+  },
+  "contacts": {
+    "registrant": {
+      "name": null,
+      "organization": null,
+      "email": null,
+      "phone": null,
+      "address": {
+        "street": null,
+        "city": null,
+        "state": null,
+        "postalCode": null,
+        "country": null
+      },
+      "redacted": true
+    },
+    "admin": {
+      "name": null,
+      "organization": null,
+      "email": null,
+      "phone": null,
+      "address": {
+        "street": null,
+        "city": null,
+        "state": null,
+        "postalCode": null,
+        "country": null
+      },
+      "redacted": true
+    },
+    "tech": {
+      "name": null,
+      "organization": null,
+      "email": null,
+      "phone": null,
+      "address": {
+        "street": null,
+        "city": null,
+        "state": null,
+        "postalCode": null,
+        "country": null
+      },
+      "redacted": true
+    },
+    "billing": {
+      "name": null,
+      "organization": null,
+      "email": null,
+      "phone": null,
+      "address": {
+        "street": null,
+        "city": null,
+        "state": null,
+        "postalCode": null,
+        "country": null
+      },
+      "redacted": true
+    }
+  },
+  "meta": {
+    "source": "rdap",
+    "server": "https://rdap.example/",
+    "fetchedAt": "0001-01-01T00:00:00Z",
+    "cached": false
+  }
+}

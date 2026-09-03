@@ -1,0 +1,114 @@
+{
+  "query": "example.com",
+  "domain": "example.com",
+  "domainUnicode": null,
+  "id": "2336799_DOMAIN_COM-VRSN",
+  "tld": "com",
+  "isRegistered": true,
+  "registrar": {
+    "name": "RESERVED-Internet Assigned Numbers Authority",
+    "ianaId": "376",
+    "url": null,
+    "whoisServer": null,
+    "abuseEmail": null,
+    "abusePhone": null,
+    "reseller": null
+  },
+  "status": [
+    "clientDeleteProhibited",
+    "clientTransferProhibited",
+    "clientUpdateProhibited"
+  ],
+  "nameservers": [
+    {
+      "name": "elliott.ns.cloudflare.com",
+      "ipv4": [],
+      "ipv6": []
+    },
+    {
+      "name": "hera.ns.cloudflare.com",
+      "ipv4": [],
+      "ipv6": []
+    }
+  ],
+  "dnssec": {
+    "signed": true,
+    "dsData": [
+      {
+        "keyTag": 2371,
+        "algorithm": 13,
+        "digestType": 2,
+        "digest": "C988EC423E3880EB8DD8A46FE06CA230EE23F35B578D64E78B29C3E1C83D245A"
+      }
+    ]
+  },
+  "dates": {
+    "created": "1995-08-14T04:00:00Z",
+    "updated": "2026-01-16T18:26:50Z",
+    "expires": "2026-08-13T04:00:00Z"
+  },
+  "contacts": {
+    "registrant": {
+      "name": null,
+      "organization": null,
+      "email": null,
+      "phone": null,
+      "address": {
+        "street": null,
+        "city": null,
+        "state": null,
+        "postalCode": null,
+        "country": null
+      },
+      "redacted": true
+    },
+    "admin": {
+      "name": null,
+      "organization": null,
+      "email": null,
+      "phone": null,
+      "address": {
+        "street": null,
+        "city": null,
+        "state": null,
+        "postalCode": null,
+        "country": null
+      },
+      "redacted": true
+    },
+    "tech": {
+      "name": null,
+      "organization": null,
+      "email": null,
+      "phone": null,
+      "address": {
+        "street": null,
+        "city": null,
+        "state": null,
+        "postalCode": null,
+        "country": null
+      },
+      "redacted": true
+    },
+    "billing": {
+      "name": null,
+      "organization": null,
+      "email": null,
+      "phone": null,
+      "address": {
+        "street": null,
+        "city": null,
+        "state": null,
+        "postalCode": null,
+        "country": null
+      },
+      "redacted": true
+    }
+  },
+  "meta": {
+    "source": "rdap",
+    "server": "https://rdap.example/",
+    "fetchedAt": "0001-01-01T00:00:00Z",
+    "cached": false
+  }
+}

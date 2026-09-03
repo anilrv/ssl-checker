@@ -31,6 +31,7 @@ func check(host string) {
 		res.ChainLength, res.ChainComplete, res.ChainVerified, res.LeafSelfSigned)
 	fmt.Printf("alpn=%q ocspStapled=%v sctCount=%d handshakeMs=%d server=%q poweredBy=%q\n",
 		res.ALPNProtocol, res.OCSPStapled, res.SCTCount, res.HandshakeMs, res.ServerHeader, res.PoweredBy)
+	fmt.Printf("hsts=%q csp=%q xFrameOptions=%q\n", res.HSTS, res.CSP, res.XFrameOptions)
 
 	if geo := geoip.Lookup(ctx, ip); geo != nil {
 		fmt.Printf("geo: city=%q country=%q code=%q flag=%q flagData=%dB asn=%q asName=%q\n",

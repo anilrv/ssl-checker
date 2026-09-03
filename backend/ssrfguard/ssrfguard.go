@@ -112,7 +112,7 @@ var reservedTLDs = map[string]bool{
 }
 
 // NeverPubliclyResolvable reports whether hostname is an IP-address literal (any range,
-// public or private — whoisjson.com's domain-only API can't do anything useful with one
+// public or private — a domain-only RDAP/WHOIS lookup can't do anything useful with one
 // either way) or ends in a reserved/private-use label. Both cases can never have a real
 // public DNS record or WHOIS registration, so DNS and WHOIS lookups for them are wasted
 // calls by construction, not failures worth retrying.

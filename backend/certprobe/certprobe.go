@@ -82,8 +82,11 @@ type Result struct {
 	SCTCount     int
 	HandshakeMs  int64
 
-	ServerHeader string
-	PoweredBy    string
+	ServerHeader  string
+	PoweredBy     string
+	HSTS          string
+	CSP           string
+	XFrameOptions string
 }
 
 func protocolName(version uint16) string {
@@ -263,7 +266,7 @@ func Probe(ctx context.Context, ip net.IP, hostname string) (*Result, error) {
 	// Best-effort only: reuses this same already-open connection (no second handshake).
 	// Any failure here just leaves ServerHeader/PoweredBy empty — the probe already
 	// succeeded once the certificate was read above, and must not fail because of this.
-	result.ServerHeader, result.PoweredBy = fetchServerHeaders(rawConn, tlsConn, hostname)
+	result.ServerHeader, result.PoweredBy, result.HSTS, result.CSP, result.XFrameOptions = fetchServerHeaders(rawConn, tlsConn, hostname)
 
 	return result, nil
 }
@@ -273,9 +276,9 @@ func Probe(ctx context.Context, ip net.IP, hostname string) (*Result, error) {
 // ctx's deadline (which may already be nearly exhausted by the handshake above) — a
 // short, fixed budget of its own so this optional step can't meaningfully delay the
 // overall probe even in the worst case.
-func fetchServerHeaders(rawConn net.Conn, tlsConn *tls.Conn, hostname string) (server, poweredBy string) {
+func fetchServerHeaders(rawConn net.Conn, tlsConn *tls.Conn, hostname string) (server, poweredBy, hsts, csp, xFrameOptions string) {
 	if err := rawConn.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {
-		return "", ""
+		return "", "", "", "", ""
 	}
 
 	// A connection that negotiated ALPN "h2" only understands the HTTP/2 wire format from
@@ -288,44 +291,48 @@ func fetchServerHeaders(rawConn net.Conn, tlsConn *tls.Conn, hostname string) (s
 
 	req, err := http.NewRequest(http.MethodHead, "https://"+hostname+"/", nil)
 	if err != nil {
-		return "", ""
+		return "", "", "", "", ""
 	}
 	req.Header.Set("Connection", "close")
 	req.Host = hostname
 
 	if err := req.Write(tlsConn); err != nil {
-		return "", ""
+		return "", "", "", "", ""
 	}
 
 	resp, err := http.ReadResponse(bufio.NewReader(tlsConn), req)
 	if err != nil {
-		return "", ""
+		return "", "", "", "", ""
 	}
 	defer resp.Body.Close()
 
-	return resp.Header.Get("Server"), resp.Header.Get("X-Powered-By")
+	return resp.Header.Get("Server"), resp.Header.Get("X-Powered-By"),
+		resp.Header.Get("Strict-Transport-Security"), resp.Header.Get("Content-Security-Policy"),
+		resp.Header.Get("X-Frame-Options")
 }
 
 // fetchServerHeadersH2 sends the same best-effort HEAD request as fetchServerHeaders, but
 // over the HTTP/2 framing required once ALPN has negotiated "h2" on this connection.
-func fetchServerHeadersH2(tlsConn *tls.Conn, hostname string) (server, poweredBy string) {
+func fetchServerHeadersH2(tlsConn *tls.Conn, hostname string) (server, poweredBy, hsts, csp, xFrameOptions string) {
 	req, err := http.NewRequest(http.MethodHead, "https://"+hostname+"/", nil)
 	if err != nil {
-		return "", ""
+		return "", "", "", "", ""
 	}
 	req.Host = hostname
 
 	cc, err := (&http2.Transport{}).NewClientConn(tlsConn)
 	if err != nil {
-		return "", ""
+		return "", "", "", "", ""
 	}
 	resp, err := cc.RoundTrip(req)
 	if err != nil {
-		return "", ""
+		return "", "", "", "", ""
 	}
 	defer resp.Body.Close()
 
-	return resp.Header.Get("Server"), resp.Header.Get("X-Powered-By")
+	return resp.Header.Get("Server"), resp.Header.Get("X-Powered-By"),
+		resp.Header.Get("Strict-Transport-Security"), resp.Header.Get("Content-Security-Policy"),
+		resp.Header.Get("X-Frame-Options")
 }
 
 // SupportsLegacyProtocol reports whether the server still completes a handshake when

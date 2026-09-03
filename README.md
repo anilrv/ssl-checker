@@ -33,8 +33,9 @@ already-deployed backend (`ssl-checker.anilrv.in`) and fetches its own access ke
 backend on first use. The backend performs a real TLS handshake against the site you're
 viewing (with certificate verification intentionally disabled, since the goal is to
 *inspect* invalid certs, not reject the connection because of one), then enriches the
-result with a WHOIS lookup ([whoisjson.com](https://whoisjson.com)) and an IP geolocation
-lookup ([ipgeolocation.io](https://ipgeolocation.io)) run concurrently with the probe.
+result with a WHOIS/RDAP lookup (queried directly against the domain's own registry — no
+third-party API) and an IP geolocation lookup ([ipgeolocation.io](https://ipgeolocation.io))
+run concurrently with the probe.
 Both enrichment lookups are best-effort — a slow or failed upstream never breaks the core
 certificate check, it just leaves those fields blank.
 
@@ -65,8 +66,8 @@ go run ./cmd/localtest
 ```
 
 Running the function locally (`func start`) needs a `local.settings.json` with
-`CHECKSSL_KEY`, `WHOISJSON_TOKEN`, and `IPGEOLOCATION_TOKEN` set — this file is gitignored
-and never committed. Deploy with:
+`CHECKSSL_KEY` and `IPGEOLOCATION_TOKEN` set — this file is gitignored and never
+committed. Deploy with:
 
 ```
 func azure functionapp publish ssl-checker

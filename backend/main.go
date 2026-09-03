@@ -114,9 +114,12 @@ type CheckResult struct {
 	OCSPStapled  bool   `json:"ocspStapled,omitempty"`
 	SCTCount     int    `json:"sctCount,omitempty"`
 	HandshakeMs  int64  `json:"handshakeMs,omitempty"`
-	Server       string `json:"server,omitempty"`
-	PoweredBy    string `json:"poweredBy,omitempty"`
-	ResolvedIP   string `json:"resolvedIP,omitempty"` // the IP (v4 or v6) the hostname resolved to for this check
+	Server        string `json:"server,omitempty"`
+	PoweredBy     string `json:"poweredBy,omitempty"`
+	HSTS          string `json:"hsts,omitempty"`
+	CSP           string `json:"csp,omitempty"`
+	XFrameOptions string `json:"xFrameOptions,omitempty"`
+	ResolvedIP    string `json:"resolvedIP,omitempty"` // the IP (v4 or v6) the hostname resolved to for this check
 
 	GeoCountry     string `json:"geoCountry,omitempty"`
 	GeoCountryCode string `json:"geoCountryCode,omitempty"`
@@ -174,6 +177,9 @@ var issueCatalog = map[string]IssueDetail{
 	"resolve-failed":       {Label: "Could not resolve this hostname", Level: "info"},
 	"probe-failed":         {Label: "Could not connect to check the certificate", Level: "info"},
 	"private-use-host":     {Label: "Private-use address or reserved hostname — no public certificate data available", Level: "info"},
+	"missing-hsts":         {Label: "Server does not send a Strict-Transport-Security header", Level: "info"},
+	"missing-csp":          {Label: "Server does not send a Content-Security-Policy header", Level: "info"},
+	"missing-xfo":          {Label: "Server does not send an X-Frame-Options header", Level: "info"},
 }
 
 // setIssues stores the codes plus their catalog metadata on the result, keeping the
@@ -558,7 +564,7 @@ func performCheck(ctx context.Context, hostname string) CheckResult {
 
 	// IP literals and reserved/private-use TLDs (.local, .internal, etc.) can never have
 	// a public DNS record or WHOIS registration — reject instantly, before spending a
-	// DNS-over-HTTPS or whoisjson.com round trip on something guaranteed to fail.
+	// DNS-over-HTTPS or RDAP/WHOIS round trip on something guaranteed to fail.
 	if ssrfguard.NeverPubliclyResolvable(hostname) {
 		result.Error = hostname + " is a private-use address or reserved hostname and can't have a publicly verifiable certificate"
 		setIssues(&result, []string{"private-use-host"})
@@ -576,7 +582,7 @@ func performCheck(ctx context.Context, hostname string) CheckResult {
 	// whois.Lookup, like geoip.Lookup below, only starts once DNS resolution has
 	// confirmed a public IP — never blind/concurrent with it — so a hostname that fails
 	// to resolve, or resolves only to a private IP (e.g. corporate split-horizon DNS),
-	// never triggers a whoisjson.com call either. The channel is buffered so the
+	// never triggers an RDAP/WHOIS call either. The channel is buffered so the
 	// goroutine can't leak even if this function returns early before anyone reads it.
 	whoisCh := make(chan *whois.Info, 1)
 	go func() { whoisCh <- whois.Lookup(ctx, hostname) }()
@@ -625,6 +631,9 @@ func performCheck(ctx context.Context, hostname string) CheckResult {
 	result.HandshakeMs = probe.HandshakeMs
 	result.Server = probe.ServerHeader
 	result.PoweredBy = probe.PoweredBy
+	result.HSTS = probe.HSTS
+	result.CSP = probe.CSP
+	result.XFrameOptions = probe.XFrameOptions
 
 	if geo := <-geoCh; geo != nil {
 		result.GeoCountry = geo.Country
@@ -725,6 +734,16 @@ func computeIssues(result *CheckResult, probe *certprobe.Result, weakProtocol bo
 	}
 	if probe.KeyType == "RSA" && probe.KeyBits > 0 && probe.KeyBits < minRSAKeyBits {
 		issues = append(issues, "weak-key")
+	}
+
+	if probe.HSTS == "" {
+		issues = append(issues, "missing-hsts")
+	}
+	if probe.CSP == "" {
+		issues = append(issues, "missing-csp")
+	}
+	if probe.XFrameOptions == "" {
+		issues = append(issues, "missing-xfo")
 	}
 
 	// Domain age is a phishing/typosquat signal, tiered: red inside 10 days, yellow

@@ -341,6 +341,24 @@ func TestComputeIssuesWeakCrypto(t *testing.T) {
 	}
 }
 
+func TestComputeIssuesMissingHeaders(t *testing.T) {
+	now := time.Now()
+
+	probe := healthyProbe(now)
+	if issues := computeIssues(&CheckResult{Hostname: "example.com"}, probe, false); !contains(issues, "missing-hsts") || !contains(issues, "missing-csp") || !contains(issues, "missing-xfo") {
+		t.Errorf("all headers absent: expected missing-hsts/missing-csp/missing-xfo, got %v", issues)
+	}
+
+	probe = healthyProbe(now)
+	probe.HSTS = "max-age=31536000"
+	probe.CSP = "default-src 'self'"
+	probe.XFrameOptions = "DENY"
+	issues := computeIssues(&CheckResult{Hostname: "example.com"}, probe, false)
+	if contains(issues, "missing-hsts") || contains(issues, "missing-csp") || contains(issues, "missing-xfo") {
+		t.Errorf("all headers present: expected none of missing-hsts/missing-csp/missing-xfo, got %v", issues)
+	}
+}
+
 func TestIssueCatalogAndSetIssues(t *testing.T) {
 	// Every code any backend path can emit; keep in step with computeIssues and the
 	// resolve-failed/probe-failed paths in performCheck.
@@ -349,7 +367,7 @@ func TestIssueCatalogAndSetIssues(t *testing.T) {
 		"hostname-mismatch", "weak-protocol", "revoked", "weak-signature", "weak-key",
 		"recently-registered", "young-domain",
 		"cert-expiring-soon", "domain-expiring-soon", "resolve-failed", "probe-failed",
-		"private-use-host",
+		"private-use-host", "missing-hsts", "missing-csp", "missing-xfo",
 	}
 	validLevels := map[string]bool{"critical": true, "warning": true, "info": true}
 	for _, code := range emitted {

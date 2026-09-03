@@ -1,0 +1,115 @@
+{
+  "query": "google.it",
+  "domain": "google.it",
+  "domainUnicode": null,
+  "id": null,
+  "tld": "it",
+  "isRegistered": true,
+  "registrar": {
+    "name": "MARKMONITOR-REG",
+    "ianaId": null,
+    "url": "https://www.markmonitor.com/",
+    "whoisServer": null,
+    "abuseEmail": null,
+    "abusePhone": null,
+    "reseller": null
+  },
+  "status": [
+    "ok"
+  ],
+  "nameservers": [
+    {
+      "name": "ns1.google.com",
+      "ipv4": [],
+      "ipv6": []
+    },
+    {
+      "name": "ns2.google.com",
+      "ipv4": [],
+      "ipv6": []
+    },
+    {
+      "name": "ns3.google.com",
+      "ipv4": [],
+      "ipv6": []
+    },
+    {
+      "name": "ns4.google.com",
+      "ipv4": [],
+      "ipv6": []
+    }
+  ],
+  "dnssec": {
+    "signed": false,
+    "dsData": []
+  },
+  "dates": {
+    "created": "1999-12-10T00:00:00Z",
+    "updated": "2026-05-07T00:54:08Z",
+    "expires": "2027-04-21T00:00:00Z"
+  },
+  "contacts": {
+    "registrant": {
+      "name": null,
+      "organization": "Google Ireland Holdings Unlimited Company",
+      "email": null,
+      "phone": null,
+      "address": {
+        "street": "70 Sir John Rogerson's Quay, Dublin, 2, Dublin, IE",
+        "city": null,
+        "state": null,
+        "postalCode": null,
+        "country": null
+      },
+      "redacted": false
+    },
+    "admin": {
+      "name": "Colm Buckley",
+      "organization": "Google LLC",
+      "email": null,
+      "phone": null,
+      "address": {
+        "street": "1600 Amphitheatre Parkway, Mountain View, 94043, CA, US",
+        "city": null,
+        "state": null,
+        "postalCode": null,
+        "country": null
+      },
+      "redacted": false
+    },
+    "tech": {
+      "name": null,
+      "organization": null,
+      "email": null,
+      "phone": null,
+      "address": {
+        "street": null,
+        "city": null,
+        "state": null,
+        "postalCode": null,
+        "country": null
+      },
+      "redacted": true
+    },
+    "billing": {
+      "name": null,
+      "organization": null,
+      "email": null,
+      "phone": null,
+      "address": {
+        "street": null,
+        "city": null,
+        "state": null,
+        "postalCode": null,
+        "country": null
+      },
+      "redacted": true
+    }
+  },
+  "meta": {
+    "source": "whois",
+    "server": null,
+    "fetchedAt": "0001-01-01T00:00:00Z",
+    "cached": false
+  }
+}

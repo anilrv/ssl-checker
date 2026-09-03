@@ -31,9 +31,12 @@ the connection because of them). Package layout:
   SCT count, handshake timing, and the `Server`/`X-Powered-By` headers (fetched by reusing
   the already-open connection — see the HTTP/2 gotcha below).
 - `geoip/` — IP → country/city/ASN via ipgeolocation.io.
-- `whois/` — hostname → registrar/registration dates/DNS provider/owner org via
-  whoisjson.com (uses `golang.org/x/net/publicsuffix` to reduce a subdomain to its
-  registrable domain, since WHOIS operates at the domain level).
+- `whois/` — hostname → registrar/registration dates/DNS provider/owner org by querying
+  the domain's own registry directly: RDAP first, falling back to port-43 WHOIS text
+  parsing for TLDs with no RDAP server (e.g. `.be`). No third-party API, no token. The
+  protocol clients (`whois/internal/{domain,model,rdap,srcerr,whoisclient}`) are vendored
+  from [who-dat](https://github.com/lissy93/who-dat) (MIT licensed, see
+  `whois/internal/LICENSE-who-dat`) — see the vendoring note below before touching them.
 - `ssrfguard/` — resolves a hostname to a public IP only; rejects private/loopback/link-local
   targets before the probe ever dials out. `NeverPubliclyResolvable` rejects IP literals
   and reserved/private-use TLDs (`.local`, `.internal`, `.home.arpa`, etc. — verified
@@ -69,13 +72,17 @@ already does that.
 ### Conventions that matter here
 
 - **Every third-party API key lives in Azure Function app settings, never hardcoded and
-  never committed.** Currently: `CHECKSSL_KEY`, `WHOISJSON_TOKEN`, `IPGEOLOCATION_TOKEN`
-  (plus Azure-managed settings). Local equivalents go in `local.settings.json`, which is
-  gitignored.
+  never committed.** Currently: `CHECKSSL_KEY`, `IPGEOLOCATION_TOKEN` (plus Azure-managed
+  settings). Local equivalents go in `local.settings.json`, which is gitignored. `whois`
+  needs no key at all — see below.
 - **Best-effort external lookups (`geoip`, `whois`) must never surface as request errors.**
-  Each owns a short, fixed timeout (2s) independent of the parent context's remaining
-  deadline, and returns `nil` on any failure — a slow or dead upstream degrades the
-  response, it never fails it. Follow this pattern for any new lookup in the same vein.
+  Each owns a short, fixed timeout independent of the parent context's remaining deadline,
+  and returns `nil` on any failure — a slow or dead upstream degrades the response, it
+  never fails it. `geoip` uses 2s, one known-fast API host; `whois` uses a longer 3s
+  (`lookupTimeout`) plus its own separate 5s bootstrap-warm budget (`bootstrapTimeout`),
+  since it talks directly to whichever registry owns the TLD instead of one API host, and
+  a cold IANA-registry fetch shouldn't eat into the per-lookup budget. Follow this pattern
+  — short, fixed, failure-swallowing — for any new lookup in the same vein.
   Genuine failures (network error, non-200, undecodable body) are still logged at Error
   level via `slog` — silent to the caller, not silent to us; they reach Application
   Insights (importing the SDK's `sdk` package auto-installs the routing `slog` handler,
@@ -83,14 +90,16 @@ already does that.
   no token configured, revocation's "couldn't determine" outcomes, `main.go`'s
   `resolve-failed`/`probe-failed` (already visible to the caller via `result.Error`) — are
   deliberately not logged, to keep the signal to genuine failures.
-- **Three different lookups, three different auth schemes** — don't reach for the wrong
-  one by habit: WHOIS uses `Authorization: TOKEN=<token>`; geolocation uses a `?apiKey=`
-  query parameter; the function-key auth for `checkssl` is Azure's own platform mechanism.
+- **Two lookups, two auth schemes, and WHOIS uses none at all** — don't reach for the
+  wrong one by habit: geolocation uses a `?apiKey=` query parameter; the function-key auth
+  for `checkssl` is Azure's own platform mechanism; RDAP/WHOIS talk straight to whichever
+  registry owns the TLD, with no key to send.
 - **Bounded LRU caches**, one per lookup, keyed at the right granularity: `main.go`'s
   `resultsCache` (hostname, 500 entries, 24h), `geoip`'s (IP, 500, 7 days — IP-to-ASN/geo
-  data changes slowly), `whois`'s (registrable domain, 500, 30 days — persistence via the
-  durable Table Storage tier is what makes a long TTL pay off against whoisjson.com's
-  1000-request/month budget). Only successful lookups are cached, so a transient failure
+  data changes slowly), `whois`'s (registrable domain, 500, 30 days — registration data
+  barely changes day-to-day, and persistence via the durable Table Storage tier means a
+  cold start doesn't have to re-query a registry for a domain this instance already
+  resolved recently). Only successful lookups are cached, so a transient failure
   self-heals on the next request instead of being cached as a permanent miss. `main.go`'s
   `resultsCache` has one deliberate exception: a `private-use-host` result (IP literal or
   reserved TLD, from `ssrfguard.NeverPubliclyResolvable`) is cached too, because that verdict
@@ -112,17 +121,31 @@ already does that.
   bug (Server header silently empty for every h2 site, i.e. most of the modern web) before
   the branch existed — if you touch this function, keep both paths and test against an h2
   site (e.g. `www.google.com`) and a `http/1.1` one (e.g. `self-signed.badssl.com`).
-- **`whois.go` decodes whoisjson.com's response field-by-field, not into one struct.**
-  Their JSON shape is inconsistent across registries — e.g. `contacts` is normally
-  `{"owner": [...]}` but a bare `[]` for privacy-redacted domains — and `encoding/json`
-  aborts decoding the *entire* object on a single field's type mismatch. This was a real
-  shipped bug: `dominos.co.in` had valid `registrar`/`created`/`expires` in the response,
-  but the `contacts: []` shape mismatch threw all of it away and `Lookup` returned `nil`.
-  Each field is now decoded independently via `json.RawMessage`/`decodeField`, so one
-  field's shape surprise degrades only that field. A decoded `Info` with every field still
-  empty is treated as no lookup at all (returns `nil`, uncached) rather than a "successful"
-  empty result — the latter would otherwise freeze "no domain info" in the cache for the
-  full 30-day TTL.
+- **`whois/internal/{domain,model,rdap,srcerr,whoisclient}` are vendored from
+  [who-dat](https://github.com/lissy93/who-dat), not written here.** Copied in (MIT
+  licensed, `whois/internal/LICENSE-who-dat` carries the required notice) rather than
+  imported as a module, because who-dat keeps this code under its own `internal/`
+  package — Go's internal-import rule means only a copy works from outside that module.
+  Every vendored file says so in its header comment. Two deliberate additions on top of
+  upstream: `rdap.Client.WarmBootstrap` (so a cold IANA-registry fetch gets its own timeout
+  budget, not the tighter per-lookup one — see `whois.go`'s `bootstrapTimeout` vs.
+  `lookupTimeout`), and the port-43 client's package is renamed `whoisclient` (upstream
+  calls it `whois`, which would collide with this repo's own top-level `whois` package).
+  Don't "clean up" these files to match repo style beyond that — matching upstream verbatim
+  is what makes a future re-vendor a clean diff. `whois.go` itself is this repo's code: it
+  runs RDAP first, falls back to WHOIS on `srcerr.ErrNoSource`, maps the result onto the
+  local `Info` shape, and applies this package's own cache (above) — deliberately *not*
+  who-dat's own `internal/lookup`/`internal/cache`, which duplicate that.
+- **`DetectedProviders` (the "DNS Provider" row) is this repo's own code, not who-dat's.**
+  Neither RDAP nor WHOIS report a hosting/DNS provider label directly — who-dat's own
+  hosted API doesn't compute one either. `whois.go`'s `nsProviderPatterns` is a small
+  substring-match table over raw nameserver hostnames (e.g. `awsdns` → `aws-route53`,
+  `cloudflare` → `cloudflare`) that reimplements what whoisjson.com (the now-retired
+  third-party API this package used before) computed server-side. Extend the table, don't
+  reach for an external lookup, when a new provider needs recognizing.
+- A decoded `Info` with every field still empty is treated as no lookup at all (returns
+  `nil`, uncached) rather than a "successful" empty result — the latter would otherwise
+  freeze "no domain info" in the cache for the full 30-day TTL.
 - **The backend owns issue metadata.** `issueCatalog` in `main.go` maps every issue code
   to its label and severity, and `setIssues` ships them per-result as `issueDetails`
   alongside the bare `issues` codes. The extension renders from `issueDetails` and treats
@@ -202,7 +225,7 @@ Manifest V3. Two independent surfaces read the same `CheckResult`:
   (e.g. Russian's 1 / 2–4 / 5+), a known gap to revisit if it turns out to matter. Shipped
   locales today: `en` (baseline), `de`, `zh_CN`, `tr`, `ja`, `ru`, `fr`, `pt_BR` — every non-`en` file must
   carry all 57 `en` keys plus every `issue_*` key backend/main.go's `issueCatalog` defines
-  (17 as of this writing), with every `$NAME$` placeholder token preserved verbatim; a quick
+  (20 as of this writing), with every `$NAME$` placeholder token preserved verbatim; a quick
   Node script diffing `Object.keys()` against `en` (plus substring-checking each placeholder
   token) catches key-name/placeholder drift, but **not** a locale file merely lagging behind
   a newer backend issue code** — that only shows up as a code missing from all five locale
@@ -298,6 +321,7 @@ Upload-zip rules (learned the hard way; the store's docs don't spell these out):
 
 ## Required Azure Function app settings
 
-`CHECKSSL_KEY`, `WHOISJSON_TOKEN`, `IPGEOLOCATION_TOKEN` (plus whatever Azure itself
-manages, e.g. `AzureWebJobsStorage`). None of these are ever committed; they live only in
+`CHECKSSL_KEY`, `IPGEOLOCATION_TOKEN` (plus whatever Azure itself
+manages, e.g. `AzureWebJobsStorage`). `whois` needs no app setting — it talks to
+registries directly, with no key. None of these are ever committed; they live only in
 Azure app settings and, for local runs, `backend/local.settings.json` (gitignored).
